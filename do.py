@@ -8,8 +8,16 @@ import tempfile
 import shutil
 import argparse
 
+#
+# USAGE:
+# 0) create single-file TEX files to be generated in src/
+# 1) Provide \VAR{csapatnev} where the team name is to be written
+# 2) Fill out possible categories: point to the TEX files created
+# 3) Fix header names from CSV if it changed
+# 4) Run `python do.py`
+#
+
 possible_categories = {'C kategória': 'C.tex', 'D kategória': 'D.tex'}
-possible_places = set(['Budapest', 'Zenta', 'Miskolc', 'Eger', 'Hatvan'])
 category_header = 'Kategória'
 teamname_header = 'Csapatnév'
 place_header = 'Helyszín'
@@ -23,8 +31,6 @@ def ensure_dir(path):
         os.mkdir(path)
 def initialize_output_directories():
     ensure_dir('target')
-    for place in possible_places:
-        ensure_dir(get_place_directory(place))
 
 def load_templates():
     # JINJA2 latex templating https://www.miller-blog.com/latex-with-jinja2/
@@ -86,9 +92,8 @@ def handle_team(id, row):
     place = row[place_header]
     good = True # write all warnings
     logging.info(f'Adding team {teamname}')
-    if place not in possible_places:
-        logging.error(f"Error: {place} not in {[*possible_places]}. Skipping.")
-        good = False
+    ensure_dir(get_place_directory(place))
+
     if category not in possible_categories:
         logging.error(f"Error: {category} not in {[*possible_categories.keys()]}. Skipping.")
         good = False
@@ -108,7 +113,15 @@ def handle_team(id, row):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(usage="""
+USAGE:
+0) create single-file TEX files to be generated in src/
+1) In the TEX file provide \VAR{csapatnev} where the team name is to be written
+2) In the head of do.py, fill out possible_categories; here point to the TEX files created (without src/)
+3) Fix header names from CSV if it changed
+4) Run `python do.py`
+
+""")
     parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
     args = parser.parse_args()
     logging.basicConfig(level=args.loglevel)
