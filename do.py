@@ -10,11 +10,12 @@ import argparse
 
 #
 # USAGE:
-# 0) create single-file TEX files to be generated in src/
-# 1) Provide \VAR{csapatnev} where the team name is to be written
-# 2) Fill out possible categories: point to the TEX files created
-# 3) Fix header names from CSV if it changed
-# 4) Run `python do.py`
+# 0) Create single-file TEX files to be generated in src/
+# 1) Download team data in "Tab-separated value (.tsv, current sheet)" format e.g. (local.tsv)
+# 2) In the TEX file provide \VAR{csapatnev} where the team name is to be written
+# 3) In the head of do.py, fill out possible_categories; here point to the TEX files created (without src/)
+# 4) Fix header names from CSV if it changed
+# 5) Run `python do.py local.tsv`
 #
 
 possible_categories = {'C kategória': 'C.tex', 'D kategória': 'D.tex'}
@@ -115,21 +116,23 @@ def handle_team(id, row):
 def main():
     parser = argparse.ArgumentParser(usage="""
 USAGE:
-0) create single-file TEX files to be generated in src/
-1) In the TEX file provide \VAR{csapatnev} where the team name is to be written
-2) In the head of do.py, fill out possible_categories; here point to the TEX files created (without src/)
-3) Fix header names from CSV if it changed
-4) Run `python do.py`
+1) Create single-file TEX files to be generated in src/
+2) Download team data in "Tab-separated value (.tsv, current sheet)" format e.g. (local.tsv)
+3) In the TEX file provide \VAR{csapatnev} where the team name is to be written
+4) In the head of do.py, fill out possible_categories; here point to the TEX files created (without src/)
+5) Fix header names from CSV if it changed
+6) Run `python do.py local.tsv`
 
 """)
     parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
+    parser.add_argument("tsvfile")
     args = parser.parse_args()
     logging.basicConfig(level=args.loglevel)
 
     initialize_output_directories()
 
     try:
-        with open('xv-helyi.tsv', 'r', newline='') as f:
+        with open(args.tsvfile, 'r', newline='') as f:
             reader = csv.DictReader(f, delimiter='\t', quotechar='"')
             id=0
             if len(set(reader.fieldnames)) != len(reader.fieldnames):
