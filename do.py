@@ -18,10 +18,13 @@ import argparse
 # 5) Run `python do.py local.tsv`
 #
 
-possible_categories = {'C kategória': 'C.tex', 'D kategória': 'D.tex'}
+possible_categories = {'C kategória': 'HUN/15HC.tex', 'D kategória': 'HUN/15HD.tex', 'E kategória': 'HUN/15HE.tex', 'E+ kategória': 'HUN/15HEp.tex'} #, 'F kategória': 'C.tex', 'F+ kategória': 'C.tex', 'K kategória': 'C.tex', 'K+ kategória': 'C.tex', }
+templated_files = ['magic/feladat.tex.j2']
 category_header = 'Kategória'
 teamname_header = 'Csapatnév'
 place_header = 'Helyszín'
+
+
 
 # I/O
 def get_place_directory(place):
@@ -42,7 +45,7 @@ def load_templates():
         variable_end_string='}',
         comment_start_string='\#{',
         comment_end_string='}',
-        line_statement_prefix='%%',
+        line_statement_prefix='%%%%%%%%%%%%%%', # TODO hack, find out what this really do
         line_comment_prefix='%#',
         trim_blocks=True,
         autoescape=False,
@@ -50,9 +53,10 @@ def load_templates():
     )
     templates = {}
 
-    for category_name in possible_categories:
-        category_fn = possible_categories[category_name]
-        templates[category_name] = latex_jinja_env.get_template(category_fn)
+    for templated_fn in templated_files:
+        assert templated_fn.endswith('.j2') # for JinJa template
+        output_fn = templated_fn[:-3]
+        templates[output_fn] = latex_jinja_env.get_template(templated_fn)
     return templates
 
 class LatexCompileError(Exception):
@@ -62,22 +66,29 @@ class LatexCompileError(Exception):
 def sanitize_teamname(s):
     return s.replace("_", "\\_")
 
-def compile_tex(input_fn, output_dir):
-    cmds = ['pdflatex', '-halt-on-error', f'-output-directory', output_dir, input_fn]
+def compile_tex(input_fn, output_name, output_dir):
+    '''
+    Parameters:
+    input_fn: filename relative to src/
+    output_name: The PDF-s name, without .pdf (must be unique in the same place)
+    output_dir: The PDF's output directory. Probably something like ../target/Budapest
+    '''
+
+    cmds = ['pdflatex', '-halt-on-error', f'-jobname={output_name}', f'-output-directory={output_dir}', input_fn]
     # not used for real command
     cmd_sanitized_for_logging = ' '.join([arg.replace(' ', '\\ ') for arg in cmds])
     logging.debug(f"Running command {cmds}")
     logging.debug(f"   $ {cmd_sanitized_for_logging}")
-    p = Popen(cmds, stdin=None, stdout=DEVNULL, stderr=DEVNULL)
+    p = Popen(cmds, stdin=None, stdout=DEVNULL, stderr=DEVNULL, cwd=os.path.abspath('src'))
     p.communicate()
     if p.returncode != 0:
         raise LatexCompileError(f"Failed to compile from {input_fn}. The file is still available for debugging")
 
 templates = load_templates()
 
-def instantiate_template(category, output_fn, **kwargs):
+def instantiate_template(template, output_fn, **kwargs):
     with open(output_fn, 'w') as f:
-        f.write(templates[category].render(**kwargs))
+        f.write(template.render(**kwargs))
 
 def lpad(s, n):
     s = str(s)
@@ -100,17 +111,22 @@ def handle_team(id, row):
         good = False
     if not good:
         return
+
     ids = lpad(id,3)
-    output_tex = os.path.join("target", place, f"{ids}.tex")
-    output_pdf = os.path.join("target", place, f"{ids}.pdf")
-    output_dir = os.path.join("target", place)
-    logging.debug(f"{teamname}; {place}; {category} -> {output_tex}")
-    instantiate_template(category, output_tex, csapatnev=sanitize_teamname(teamname))
+    # Instantiate templates
+    for template_id in templates:
+        output_tex = os.path.join("src", template_id)
+        logging.debug(f"{teamname}; {place}; {category} -> {output_tex}")
+        instantiate_template(templates[template_id], output_tex, csapatnev=sanitize_teamname(teamname))
+    # compile TEX file into PDF
+    main_tex = possible_categories[category]
+    output_pdf = f"{ids}"
+    output_dir = os.path.join("..", "target", place)
     try:
-        compile_tex(output_tex, output_dir)
+        compile_tex(main_tex, output_pdf, output_dir)
     except Exception:
         logging.error(f"Error happened while compiling {output_tex}")
-        raise
+        #raise
 
 
 def main():
@@ -136,7 +152,7 @@ USAGE:
             reader = csv.DictReader(f, delimiter='\t', quotechar='"')
             id=0
             if len(set(reader.fieldnames)) != len(reader.fieldnames):
-                raise ValueError("Duplicate fieldname! Not going to proceed! Fix team table")
+                pass#raise ValueError("Duplicate fieldname! Not going to proceed! Fix team table")
             for row in reader:
                 handle_team(id, row)
                 id += 1
