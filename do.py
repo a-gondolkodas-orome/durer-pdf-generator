@@ -31,8 +31,23 @@ USAGE:
   - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
 '''
 
-possible_categories = {'C kategória': 'HUN/15HC.tex', 'D kategória': 'HUN/15HD.tex', 'E kategória': 'HUN/15HE.tex', 'E+ kategória': 'HUN/15HEp.tex'} #, 'F kategória': 'C.tex', 'F+ kategória': 'C.tex', 'K kategória': 'C.tex', 'K+ kategória': 'C.tex', }
-templated_files = ['magic/feladat.tex.j2']
+possible_categories = {
+    'C kategória': 'HUN/15HC.tex',
+    'D kategória': 'HUN/15HD.tex',
+    'E kategória': 'HUN/15HE.tex',
+    'E+ kategória': 'HUN/15HEp.tex',
+    'F kategória': 'F/main.tex',
+    'F+ kategória': 'Fp/main.tex',
+    'K kategória': 'K/15IK.tex',
+    'K+ kategória': 'K/15IKplusz.tex',
+    }
+templated_files = [
+    'magic/feladat.tex.j2',
+    'F/main.tex.j2',
+    'Fp/main.tex.j2',
+    'K/15IK.tex.j2',
+    'K/15IKplusz.tex.j2',
+]
 category_header = 'Kategória'
 teamname_header = 'Csapatnév'
 place_header = 'Helyszín'
@@ -130,7 +145,8 @@ def handle_team(id, row):
     for template_id in templates:
         output_tex = os.path.join("src", template_id)
         logging.debug(f"{teamname}; {place}; {category} -> {output_tex}")
-        instantiate_template(templates[template_id], output_tex, csapatnev=sanitize_teamname(teamname))
+        instantiate_template(templates[template_id], output_tex, csapatnev=sanitize_teamname(teamname),
+            helyszin=place)
     # compile TEX file into PDF
     main_tex = possible_categories[category]
     output_pdf = f"{ids}"
