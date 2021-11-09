@@ -126,12 +126,14 @@ def lpad(s, n):
     return s
 
 def handle_team(id, row):
-    logging.debug('Adding new team')
+    ids = lpad(id,3)
+    output_pdf = f"{ids}"
+    logging.debug(f'Adding new team')
     category = row[category_header]
     teamname = row[teamname_header]
     place = row[place_header]
     good = True # write all warnings
-    logging.info(f'Adding team {teamname}')
+    logging.info(f'Adding team {teamname} ({category} {place} #{ids})')
     ensure_dir(get_place_directory(place))
 
     if category not in possible_categories:
@@ -140,7 +142,6 @@ def handle_team(id, row):
     if not good:
         return
 
-    ids = lpad(id,3)
     # Instantiate templates
     for template_id in templates:
         output_tex = os.path.join("src", template_id)
@@ -149,12 +150,11 @@ def handle_team(id, row):
             helyszin=place)
     # compile TEX file into PDF
     main_tex = possible_categories[category]
-    output_pdf = f"{ids}"
     output_dir = os.path.join("..", "target", place)
     try:
         compile_tex(main_tex, output_pdf, output_dir)
     except Exception:
-        logging.error(f"Error happened while compiling {output_tex}")
+        logging.error(f"Error happened while compiling {main_tex}")
         #raise
 
 
