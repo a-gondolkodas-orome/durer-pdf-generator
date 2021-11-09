@@ -3,12 +3,25 @@ Local contest problems with the teamnames printed in the header.
 
 ## USAGE:
 
-1) Create single-file TEX files to be generated in src/
-2) Download team data in "Tab-separated value (.tsv, current sheet)" format e.g. (local.tsv)
-3) In the TEX file provide \VAR{csapatnev} where the team name is to be written
-4) In the head of do.py, fill out possible_categories; here point to the TEX files created (without src/)
-5) Fix header names from CSV if it changed
-6) Run `python do.py local.tsv`
+0) Copy TEX files which need to be compiled in `src/`.
+  - The current working directory will be `src/`, meaning that it works similar to Overleaf
+1) Download team data in `Tab-separated value (.tsv, current sheet)` format to a file e.g. (`local.tsv`)
+  - There is a live version for XV, ask for link. (3 columns for teamname, category and place)
+2) In the TEX file provide `\VAR{csapatnev}` and `\VAR{helyszin}` where the team name or place is needed
+  - For files where this is needed, rename `something.tex` to `something.tex.j2`.
+  - The software will create `something.tex` for every separate file before compiling.
+3) At the start of do.py, fill out the fields.
+  - `possible_categories`: map category (name as in the TSV) to the corresponding main TEX file
+  - `templated_files`: a list of every file where data needs to be rewritten in any categories.
+  - `*_header`: The TSV file's header name which contains teamname, category and place
+4) Run `python do.py local.tsv`
+  - This needs a full setup of PDFLaTeX (with all the necessary packages).
+  - This creates for all places (here `VPG`) files like `target/VPG/105.pdf`.
+  - Log files are also here.
+  - You might want to check out the generated PDFs for strange teamnames.
+5) Run `./merger.sh`
+  - This needs `poppler`, which contains the `pdfunite` binary.
+  - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
 
 ## Templating in the margin
 
