@@ -8,6 +8,11 @@ import tempfile
 import shutil
 import argparse
 
+from PyPDF2 import PdfFileWriter, PdfFileReader
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+
 '''
 USAGE:
 0) Copy TEX files which need to be compiled in `src/`.
@@ -32,14 +37,14 @@ USAGE:
 '''
 
 possible_categories = {
-    'C kategória': 'HUN/15HC.tex',
-    'D kategória': 'HUN/15HD.tex',
-    'E kategória': 'HUN/15HE.tex',
-    'E+ kategória': 'HUN/15HEp.tex',
-    'F kategória': 'F/main.tex',
-    'F+ kategória': 'Fp/main.tex',
-    'K kategória': 'K/15IK.tex',
-    'K+ kategória': 'K/15IKplusz.tex',
+    'C kategória': 'C_vegleges_v2.pdf',
+    'D kategória': 'D_vegleges_v2.pdf',
+    'E kategória': 'E_vegleges.pdf',
+    'E+ kategória': 'Eplusz_vegleges.pdf',
+    'F kategória': 'F2021.pdf',
+    'F+ kategória': 'Fpluß2021.pdf',
+    'K kategória': '15IK-es-cikk.pdf',
+    'K+ kategória': '15IKplusz-es-cikk.pdf',
     }
 num = {
     'C kategória': 3,
@@ -51,13 +56,7 @@ num = {
     'K kategória': 1,
     'K+ kategória': 1,
     }
-templated_files = [
-    'magic/feladat.tex.j2',
-    'F/main.tex.j2',
-    'Fp/main.tex.j2',
-    'K/15IK.tex.j2',
-    'K/15IKplusz.tex.j2',
-]
+
 category_header = 'Kategória'
 teamname_header = 'Csapatnév'
 place_header = 'Helyszín'
@@ -66,6 +65,32 @@ place_header = 'Helyszín'
 packages='''
 \\usepackage{fancyvrb}
 '''
+
+def writeover(input_fn, output_fn, data):
+    packet = io.BytesIO()
+    # Create a new PDF with Reportlab
+    can = canvas.Canvas(packet, pagesize=A4)
+    can.rotate(90)
+    can.setFont('Helvetica-Bold', 10)
+    can.drawString(40, -30, data)
+    can.showPage()
+    can.save()
+
+    # Move to the beginning of the StringIO buffer
+    packet.seek(0)
+    new_pdf = PdfFileReader(packet)
+    # Read your existing PDF
+    existing_pdf = PdfFileReader(open(input_fn, "rb"))
+    output = PdfFileWriter()
+    # Add the "watermark" (which is the new pdf) on the existing page
+    for i in range(existing_pdf.getNumPages()):
+        page = existing_pdf.getPage(i)
+        page.mergePage(new_pdf.getPage(0))
+        output.addPage(page)
+    # Finally, write "output" to a real file
+    outputStream = open(output_fn, "wb")
+    output.write(outputStream)
+    outputStream.close()
 
 # I/O
 def get_place_directory(place):
@@ -77,34 +102,13 @@ def ensure_dir(path):
 def initialize_output_directories():
     ensure_dir('target')
 
-def load_templates():
-    # JINJA2 latex templating https://www.miller-blog.com/latex-with-jinja2/
-    latex_jinja_env = jinja2.Environment(
-        block_start_string='\BLOCK{',
-        block_end_string='}',
-        variable_start_string='\VAR{',
-        variable_end_string='}',
-        comment_start_string='\#{',
-        comment_end_string='}',
-        line_statement_prefix='%%%%%%%%%%%%%%', # TODO hack, find out what this really do
-        line_comment_prefix='%#',
-        trim_blocks=True,
-        autoescape=False,
-        loader=jinja2.FileSystemLoader(os.path.join(os.path.dirname(__file__), 'src'))
-    )
-    templates = {}
-
-    for templated_fn in templated_files:
-        assert templated_fn.endswith('.j2') # for JinJa template
-        output_fn = templated_fn[:-3]
-        templates[output_fn] = latex_jinja_env.get_template(templated_fn)
-    return templates
 
 class LatexCompileError(Exception):
     def __init__(self, *args):
         super().__init__(*args)
 
 def sanitize_teamname(s):
+    return s
     # exact team names that LaTeX cannot handle without special care
     if s == "نحن أذكياء جدا":
         return "\\textRL{نحن أذكياء جدا}"
@@ -116,29 +120,8 @@ def sanitize_teamname(s):
     s = s.replace('^', '$\\hat{\\ }$') # TODO is there a better solution?
     return "\\texttt{\\Verb|" + s + "|}" # \usepackage{fancyvrb}
 
-def compile_tex(input_fn, output_name, output_dir):
-    '''
-    Parameters:
-    input_fn: filename relative to src/
-    output_name: The PDF-s name, without .pdf (must be unique in the same place)
-    output_dir: The PDF's output directory. Probably something like ../target/Budapest
-    '''
-
-    cmds = ['pdflatex', '-halt-on-error', f'-jobname={output_name}', f'-output-directory={output_dir}', input_fn]
-    # not used for real command
-    cmd_sanitized_for_logging = ' '.join([arg.replace(' ', '\\ ') for arg in cmds])
-    logging.debug(f"Running command {cmds}")
-    logging.debug(f"   $ {cmd_sanitized_for_logging}")
-    p = Popen(cmds, stdin=None, stdout=DEVNULL, stderr=DEVNULL, cwd=os.path.abspath('src'))
-    p.communicate()
-    if p.returncode != 0:
-        raise LatexCompileError(f"Failed to compile from {input_fn}. The file is still available for debugging")
-
-templates = load_templates()
-
-def instantiate_template(template, output_fn, **kwargs):
-    with open(output_fn, 'w') as f:
-        f.write(template.render(**kwargs))
+def writeover0(input_fn, output_pdf, csapatnev, helyszin):
+    writeover(input_fn, output_pdf, f"{csapatnev} ({helyszin})")
 
 def lpad(s, n):
     s = str(s)
@@ -147,13 +130,17 @@ def lpad(s, n):
         return (n-l)*"0"+s
     return s
 
+#place_to_all_categories = {
+#
+#}
+
 def handle_team(id, row):
     ids = lpad(id,3)
-    output_pdf = f"{ids}"
     logging.debug(f'Adding new team')
     category = row[category_header]
     teamname = row[teamname_header]
     place = row[place_header]
+    output_pdf = os.path.join("target", place, f"{ids}.pdf")
     good = True # write all warnings
     logging.info(f'Adding team {teamname} ({category} {place} #{ids})')
     ensure_dir(get_place_directory(place))
@@ -165,23 +152,19 @@ def handle_team(id, row):
         return
 
     # Instantiate templates
-    for template_id in templates:
-        output_tex = os.path.join("src", template_id)
-        logging.debug(f"{teamname}; {place}; {category} -> {output_tex}")
-        instantiate_template(templates[template_id], output_tex, csapatnev=sanitize_teamname(teamname),
-            helyszin=place, packages=packages)
     # compile TEX file into PDF
-    main_tex = possible_categories[category]
-    output_dir = os.path.join("..", "target", place)
+    original_pdf = os.path.join("pdfsrc", possible_categories[category])
+    logging.debug(f"{teamname}; {place}; {category} -> {output_pdf}")
     try:
-        compile_tex(main_tex, output_pdf, output_dir)
+        writeover0(original_pdf, output_pdf, csapatnev=sanitize_teamname(teamname),
+            helyszin=place)
     except Exception:
-        logging.error(f"Error happened while compiling {main_tex}")
-        #raise
+        logging.error(f"Error happened while writing over {original_pdf}")
+        raise
     for i in range(1, num[category]):
         shutil.copy(
-            os.path.join('target', place, f"{output_pdf}.pdf"),
-            os.path.join('target', place, f"{output_pdf}-{i}.pdf")
+            os.path.join('target', place, f"{ids}.pdf"),
+            os.path.join('target', place, f"{ids}-{i}.pdf")
         )
 
 def main():
