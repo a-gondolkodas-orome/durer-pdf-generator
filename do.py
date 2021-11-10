@@ -41,6 +41,16 @@ possible_categories = {
     'K kategória': 'K/15IK.tex',
     'K+ kategória': 'K/15IKplusz.tex',
     }
+num = {
+    'C kategória': 3,
+    'D kategória': 3,
+    'E kategória': 3,
+    'E+ kategória': 3,
+    'F kategória': 3,
+    'F+ kategória': 3,
+    'K kategória': 1,
+    'K+ kategória': 1,
+    }
 templated_files = [
     'magic/feladat.tex.j2',
     'F/main.tex.j2',
@@ -52,7 +62,10 @@ category_header = 'Kategória'
 teamname_header = 'Csapatnév'
 place_header = 'Helyszín'
 
-
+# Additional packages to be used for weird characters
+packages='''
+\\usepackage{fancyvrb}
+'''
 
 # I/O
 def get_place_directory(place):
@@ -92,7 +105,16 @@ class LatexCompileError(Exception):
         super().__init__(*args)
 
 def sanitize_teamname(s):
-    return s.replace("_", "\\_")
+    # exact team names that LaTeX cannot handle without special care
+    if s == "نحن أذكياء جدا":
+        return "\\textRL{نحن أذكياء جدا}"
+    elif s == "⠀": # this is a braille space, one of the team's name
+        return "\\texttt{ }"
+    # exact characters
+    s = s.replace('_', '\\_')
+    s = s.replace('$', '\\$')
+    s = s.replace('^', '$\\hat{\\ }$') # TODO is there a better solution?
+    return "\\texttt{\\Verb|" + s + "|}" # \usepackage{fancyvrb}
 
 def compile_tex(input_fn, output_name, output_dir):
     '''
@@ -147,7 +169,7 @@ def handle_team(id, row):
         output_tex = os.path.join("src", template_id)
         logging.debug(f"{teamname}; {place}; {category} -> {output_tex}")
         instantiate_template(templates[template_id], output_tex, csapatnev=sanitize_teamname(teamname),
-            helyszin=place)
+            helyszin=place, packages=packages)
     # compile TEX file into PDF
     main_tex = possible_categories[category]
     output_dir = os.path.join("..", "target", place)
@@ -156,7 +178,11 @@ def handle_team(id, row):
     except Exception:
         logging.error(f"Error happened while compiling {main_tex}")
         #raise
-
+    for i in range(1, num[category]):
+        shutil.copy(
+            os.path.join('target', place, f"{output_pdf}.pdf"),
+            os.path.join('target', place, f"{output_pdf}-{i}.pdf")
+        )
 
 def main():
     parser = argparse.ArgumentParser(usage="""
