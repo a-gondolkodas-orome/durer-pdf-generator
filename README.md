@@ -17,49 +17,20 @@ Local contest problems with the teamnames printed in the header.
   - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
 5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
 
-## Templating in the margin
+# Local XV. Dürer -- write-up
 
-The template file was modified like this (for the math latex file):
+For future reference.
 
-```diff
-*** magic/feladat.tex  2021-11-09 15:18:56.482105439 +0100
---- magic/feladat.tex   2021-11-09 15:20:38.903300985 +0100
-*** 15,20 ****
-      }[\PackageError{tree}{Undefined option to tree: #1}{}]%
-  }%
-  
-+ \usepackage{marginnote}
-  \usepackage{amssymb}
-  \usepackage{amsmath}
-  \usepackage{enumitem}
-*** 48,58 ****
-  \def\cm{\text{cm}}
-  \def\szog{\sphericalangle}
-  
-  
-  \begin{document}
-  \fancyhf{}
-  \tree{\nyelv}
-- \chead{\includegraphics[width=17cm]{fejlecek/\kat_\nyelv_feladat.jpg}}
-  
-  \normalsize
-  
-*** 49,60 ****
-  \def\cm{\text{cm}}
-  \def\szog{\sphericalangle}
-  
-+ \reversemarginpar
-  
-  \begin{document}
-  \fancyhf{}
-  \tree{\nyelv}
-+ \chead{\includegraphics[width=17cm]{fejlecek/\kat_\nyelv_feladat.jpg}\marginnote{\rotatebox[origin=r]{90}{\VAR{csapatnev}}}}
-  
-  \normalsize
-```
+## Preprocess
 
-This adds a margin next to `\chead` (which overflows the header, which gives a warning). `\usepackage{marginnote}` and `\marginnote` is used so that it the margin itself is not a float (which would prevent usage in `\chead`). This also means that all pages contain the team's name.
+I preprocessed some PDFs: I've merged
 
-The text is rotated (the rotation is pinned to the right side of the text; i.e. that stays in place). This means that for very long team names only the last part is visible. This may need manual intervention.
+- K + paper
+- K+ + paper 
+- (every category in correct multiplicity) -> reserve.pdf
 
-`\reversemarginpar` is used so that the *left* margin is used (the problem page is one-sided).
+## Post-process
+
+This merges all PDFs from a single place.
+
+There is a tool `merger.sh` which does this job (see Usage)
