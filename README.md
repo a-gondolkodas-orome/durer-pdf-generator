@@ -1,4 +1,4 @@
-# durer-local-handout
+# durer-latex-templating
 Local contest problems with the teamnames printed in the header.
 
 ## USAGE:
