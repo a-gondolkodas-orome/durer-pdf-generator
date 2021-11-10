@@ -1,10 +1,6 @@
 import csv
 import logging
 import os
-from subprocess import Popen, DEVNULL
-import jinja2
-from jinja2.environment import Template
-import tempfile
 import shutil
 import argparse
 
@@ -12,6 +8,10 @@ from PyPDF2 import PdfFileWriter, PdfFileReader
 import io
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
+
+from reportlab.pdfbase import pdfmetrics
+
+
 
 '''
 USAGE:
@@ -61,18 +61,27 @@ category_header = 'Kategória'
 teamname_header = 'Csapatnév'
 place_header = 'Helyszín'
 
-# Additional packages to be used for weird characters
-packages='''
-\\usepackage{fancyvrb}
-'''
+from reportlab.pdfbase.ttfonts import TTFont
+
+pdfmetrics.registerFont(TTFont('MySerif', '/usr/share/fonts/noto/NotoSerif-Regular.ttf'))
+pdfmetrics.registerFont(TTFont('Arab', '/usr/share/fonts/noto/NotoNaskhArabic-Regular.ttf'))
+
 
 def writeover(input_fn, output_fn, data):
     packet = io.BytesIO()
     # Create a new PDF with Reportlab
     can = canvas.Canvas(packet, pagesize=A4)
     can.rotate(90)
-    can.setFont('Helvetica-Bold', 10)
-    can.drawString(40, -30, data)
+    can.setFont('MySerif', 10)
+    # work-around for arabic.
+    # HACK: Check for exact team name
+    if "نحن أذكياء جدا" in data:
+        can.setFont('Arab', 10)
+        can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
+        can.setFont('MySerif', 10)
+        can.drawString(100, -30, data[len("نحن أذكياء جدا"):])
+    else:
+        can.drawString(40, -30, data)
     can.showPage()
     can.save()
 
@@ -102,23 +111,8 @@ def ensure_dir(path):
 def initialize_output_directories():
     ensure_dir('target')
 
-
-class LatexCompileError(Exception):
-    def __init__(self, *args):
-        super().__init__(*args)
-
 def sanitize_teamname(s):
     return s
-    # exact team names that LaTeX cannot handle without special care
-    if s == "نحن أذكياء جدا":
-        return "\\textRL{نحن أذكياء جدا}"
-    elif s == "⠀": # this is a braille space, one of the team's name
-        return "\\texttt{ }"
-    # exact characters
-    s = s.replace('_', '\\_')
-    s = s.replace('$', '\\$')
-    s = s.replace('^', '$\\hat{\\ }$') # TODO is there a better solution?
-    return "\\texttt{\\Verb|" + s + "|}" # \usepackage{fancyvrb}
 
 def writeover0(input_fn, output_pdf, csapatnev, helyszin):
     writeover(input_fn, output_pdf, f"{csapatnev} ({helyszin})")
@@ -130,11 +124,9 @@ def lpad(s, n):
         return (n-l)*"0"+s
     return s
 
-#place_to_all_categories = {
-#
-#}
+all_places = []
 
-def handle_team(id, row):
+def handle_team(id, row=None, reserve=False):
     ids = lpad(id,3)
     logging.debug(f'Adding new team')
     category = row[category_header]
@@ -142,26 +134,35 @@ def handle_team(id, row):
     place = row[place_header]
     output_pdf = os.path.join("target", place, f"{ids}.pdf")
     good = True # write all warnings
-    logging.info(f'Adding team {teamname} ({category} {place} #{ids})')
     ensure_dir(get_place_directory(place))
 
-    if category not in possible_categories:
-        logging.error(f"Error: {category} not in {[*possible_categories.keys()]}. Skipping.")
-        good = False
+    if place not in all_places:
+        all_places.append(place)
+
+    if reserve:
+        original_pdf = os.path.join("pdfsrc", "tartalek.pdf")
+        num_copies = 1 # reserve PDF contains all categories in needed number
+    else:
+        if category not in possible_categories:
+            logging.error(f"Error: {category} not in {[*possible_categories.keys()]}. Skipping.")
+            good = False
+        else:
+            original_pdf = os.path.join("pdfsrc", possible_categories[category])
+            num_copies = num[category]
     if not good:
         return
 
     # Instantiate templates
     # compile TEX file into PDF
-    original_pdf = os.path.join("pdfsrc", possible_categories[category])
-    logging.debug(f"{teamname}; {place}; {category} -> {output_pdf}")
+
+    logging.info(f'Adding team {teamname} ({category} {place} #{ids}) -> {output_pdf} (x{num_copies})')
     try:
         writeover0(original_pdf, output_pdf, csapatnev=sanitize_teamname(teamname),
             helyszin=place)
     except Exception:
         logging.error(f"Error happened while writing over {original_pdf}")
         raise
-    for i in range(1, num[category]):
+    for i in range(1, num_copies):
         shutil.copy(
             os.path.join('target', place, f"{ids}.pdf"),
             os.path.join('target', place, f"{ids}-{i}.pdf")
@@ -205,6 +206,14 @@ USAGE:
                 pass#raise ValueError("Duplicate fieldname! Not going to proceed! Fix team table")
             for row in reader:
                 handle_team(id, row)
+                id += 1
+            # reserve for every place. In separately generated PDF.
+            for place in all_places:
+                handle_team(id, {
+                    category_header: 'reserve',
+                    teamname_header: "TARTALÉK",
+                    place_header: place
+                }, reserve=True)
                 id += 1
     except Exception:
         print("Some error happened. If it was parsing, try")
