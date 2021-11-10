@@ -1,4 +1,4 @@
-# durer-latex-templating
+# durer-pdf-generator
 Local contest problems with the teamnames printed in the header.
 
 ## USAGE:
