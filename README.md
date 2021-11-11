@@ -25,9 +25,14 @@ For future reference.
 
 I preprocessed some PDFs: I've merged
 
-- K + paper
-- K+ + paper 
-- (every category in correct multiplicity) -> reserve.pdf
+- `K` + paper
+- `K+` + paper 
+- (every category already in correct multiplicity) -> `reserve.pdf`
+  - meaning that reserve.pdf contains 3 copies of C category things.
+
+Also, I've prepared the data from teams in Excel (cross-referencing team name+category with Budapest contestants[^1]). There were 2 issues: 2 teams were registered outside Budapest, but were present in the Budapest sheet.
+
+[^1]: this sheet contains the exact place in Budapest where they will write the contest (e.g. ELTE or VPG).
 
 ## Post-process
 
