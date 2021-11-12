@@ -57,8 +57,8 @@ place_header = 'Helyszín'
 
 from reportlab.pdfbase.ttfonts import TTFont
 
-pdfmetrics.registerFont(TTFont('MySerif', '/fonts/noto/NotoSerif-Regular.ttf'))
-pdfmetrics.registerFont(TTFont('Arab', '/fonts/noto/NotoNaskhArabic-Regular.ttf'))
+pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))
+pdfmetrics.registerFont(TTFont('Arab', 'fonts/noto/NotoNaskhArabic-Regular.ttf'))
 
 
 def writeover(input_fn, output_fn, data):
@@ -72,7 +72,7 @@ def writeover(input_fn, output_fn, data):
     if "نحن أذكياء جدا" in data:
         can.setFont('Arab', 10)
         can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
-        can.setFont('MySerif', 10) # <--- is this a debug setting??
+        can.setFont('MySerif', 10)
         can.drawString(100, -30, data[len("نحن أذكياء جدا"):])
     else:
         can.drawString(40, -30, data)
