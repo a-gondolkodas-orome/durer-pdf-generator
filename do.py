@@ -188,7 +188,7 @@ USAGE:
 
     try:
         with open(args.tsvfile, 'r', newline='') as f:
-            reader = csv.DictReader(f, delimiter='\t', quotechar='"')
+            reader = csv.DictReader(f, delimiter='\t', quotechar='"', encoding='utf-8')
             id=0
             if len(set(reader.fieldnames)) != len(reader.fieldnames):
                 pass#raise ValueError("Duplicate fieldname! Not going to proceed! Fix team table")
