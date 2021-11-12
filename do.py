@@ -3,13 +3,14 @@ import logging
 import os
 import shutil
 import argparse
+from typing import List
 
-from PyPDF2 import PdfFileWriter, PdfFileReader
+from PyPDF2 import PdfFileWriter, PdfFileReader #type:ignore
 import io
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas             #type:ignore
+from reportlab.lib.pagesizes import A4          #type:ignore
 
-from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase import pdfmetrics        #type:ignore
 
 
 
@@ -55,7 +56,7 @@ category_header = 'Kategória'
 teamname_header = 'Csapatnév'
 place_header = 'Helyszín'
 
-from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.ttfonts import TTFont #type:ignore
 
 pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))
 pdfmetrics.registerFont(TTFont('Arab', 'fonts/noto/NotoNaskhArabic-Regular.ttf'))
@@ -118,7 +119,7 @@ def lpad(s, n):
         return (n-l)*"0"+s
     return s
 
-all_places = []
+all_places:List[str] = []
 
 def handle_team(id, row=None, reserve=False):
     ids = lpad(id,3)
