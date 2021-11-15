@@ -19,7 +19,7 @@ class categories(enum.Enum, str):
 
 def parse_data(tsv_path:Path) -> csv.DictReader[str]:
     if tsv_path.suffix != "tsv":
-        logging.warning('The file format suggest wrong structure')
+        logging.warning('The file format suggests wrong structure')
     with open(tsv_path,'r') as f:
         data = csv.DictReader(f,delimiter='\t')
     return data
@@ -36,7 +36,7 @@ def select_lsmall_teams(data:csv.DictReader[str])->List[Dict]:
 
 """
 Group teams by the location of local round.
-retur data grupped by group_by id
+return data groupped by group_by id
 default should be: "Helyszín (középiskola)"
 """
 def group_teams(data:Union[csv.DictReader[str],List[Dict]],group_by:str)->Dict[str,List[Dict]]:
@@ -71,7 +71,7 @@ When generating the folders the generator script MAY support the subfolder optio
 """
 def specify_Bp_teams(bp_specific:csv.DictReader[str],data:Dict[str,List[Dict]],BP_name:str = "Budapest")->Dict[str,List[Dict]]:
     if BP_name not in data:
-        logging.warning(f"Missing filed [{BP_name}] in data.")
+        logging.warning(f"Missing field [{BP_name}] in data.")
     BP_list = data[BP_name]
     BP_data_list = group_teams(bp_specific,"Helyszín")
     for key in  BP_data_list:
