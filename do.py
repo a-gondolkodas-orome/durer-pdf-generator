@@ -32,7 +32,7 @@ USAGE:
 '''
 
 possible_categories = {
-    'C kategória': 'C_vegleges_v2.pdf',
+    'C kategória': ['proba.pdf', 'proba2.pdf'],
     'D kategória': 'D_vegleges_v2.pdf',
     'E kategória': 'E_vegleges.pdf',
     'E+ kategória': 'Eplusz_vegleges.pdf',
@@ -42,7 +42,7 @@ possible_categories = {
     'K+ kategória': '15IKplusz-es-cikk.pdf',
     }
 num = {
-    'C kategória': 3,
+    'C kategória': [3,1],
     'D kategória': 3,
     'E kategória': 3,
     'E+ kategória': 3,
@@ -127,41 +127,57 @@ def handle_team(id, row=None, reserve=False):
     category = row[category_header]
     teamname = row[teamname_header]
     place = row[place_header]
-    output_pdf = os.path.join("target", place, f"{ids}.pdf")
-    good = True # write all warnings
     ensure_dir(get_place_directory(place))
 
     if place not in all_places:
         all_places.append(place)
 
+    original_pdfs = []
+    num_copies_list = []
+
     if reserve:
-        original_pdf = os.path.join("pdfsrc", "tartalek.pdf")
-        num_copies = 1 # reserve PDF contains all categories in needed number
+        original_pdfs.append(os.path.join("pdfsrc", "tartalek.pdf"))
+        num_copies_list.append(1) # reserve PDF contains all categories in needed number
     else:
         if category not in possible_categories:
             logging.error(f"Error: {category} not in {[*possible_categories.keys()]}. Skipping.")
-            good = False
         else:
-            original_pdf = os.path.join("pdfsrc", possible_categories[category])
-            num_copies = num[category]
-    if not good:
+            if isinstance(possible_categories[category], type([])) and isinstance(num[category], type([])):
+                # multiple PDFs in a category
+                for _, pdf in enumerate(possible_categories[category]): # Add all PDF to list
+                    if pdf not in os.listdir("pdfsrc"):
+                        logging.error(f"Error: {pdf} not in pdfsrc. Skipping.")
+                    else:
+                        original_pdfs.append(os.path.join("pdfsrc", pdf)) 
+                        num_copies_list.append(num[category][_])
+            else:
+                # One PDF in a category
+                if possible_categories[category] not in os.listdir("pdfsrc"):
+                    logging.error(f"Error: {possible_categories[category]} not in pdfsrc. Skipping.")
+                else:
+                    original_pdfs.append(os.path.join("pdfsrc", possible_categories[category]))
+                    num_copies_list.append(num[category])
+    if len(original_pdfs) == 0:
         return
 
     # Instantiate templates
     # compile TEX file into PDF
-
-    logging.info(f'Adding team {teamname} ({category} {place} #{ids}) -> {output_pdf} (x{num_copies})')
-    try:
-        writeover0(original_pdf, output_pdf, csapatnev=sanitize_teamname(teamname),
-            helyszin=place)
-    except Exception:
-        logging.error(f"Error happened while writing over {original_pdf}")
-        raise
-    for i in range(1, num_copies):
-        shutil.copy(
-            os.path.join('target', place, f"{ids}.pdf"),
-            os.path.join('target', place, f"{ids}-{i}.pdf")
-        )
+    for pdf_number,original_pdf in enumerate(original_pdfs):
+        output_pdf = os.path.join("target", place, f"{ids}-{pdf_number}.pdf")
+        logging.info(f'Adding team {teamname} ({category} {place} #{ids}) {original_pdf} -> {output_pdf} (x{num_copies_list[pdf_number]})')
+        try:
+                writeover0(original_pdf, output_pdf, csapatnev=sanitize_teamname(teamname), helyszin=place)
+        except Exception:
+            logging.error(f"Error happened while writing over {original_pdf}")
+            raise
+    for pdf_number,num_copies in enumerate(num_copies_list):
+        copy_counter = 0
+        for _ in range(1, num_copies):
+            copy_counter += 1
+            shutil.copy(
+                os.path.join('target', place, f"{ids}-{pdf_number}.pdf"),
+                os.path.join('target', place, f"{ids}-{pdf_number}-{copy_counter}.pdf")
+            )
 
 def main():
     parser = argparse.ArgumentParser(usage="""
@@ -197,13 +213,13 @@ USAGE:
                 handle_team(id, row)
                 id += 1
             # reserve for every place. In separately generated PDF.
-            for place in all_places:
-                handle_team(id, {
-                    category_header: 'reserve',
-                    teamname_header: "TARTALÉK",
-                    place_header: place
-                }, reserve=True)
-                id += 1
+#            for place in all_places:
+#                handle_team(id, {
+#                    category_header: 'reserve',
+#                    teamname_header: "TARTALÉK",
+#                    place_header: place
+#                }, reserve=True)
+#                id += 1
     except Exception:
         print("Some error happened. If it was parsing, try")
         print("  - Running in debug level: python do.py --loglevel=DEBUG")
