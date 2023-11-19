@@ -131,12 +131,12 @@ def handle_team(id, row=None, reserve=False):
         original_pdfs.append(os.path.join("pdfsrc", "tartalek.pdf"))
         num_copies_list.append(1) # reserve PDF contains all categories in needed number
     else:
-        if category not in all_possible_categories:
-            logging.error(f"Error: {category} not in {[*all_possible_categories.keys()]}. Skipping.")
+        if category not in possible_categories:
+            logging.error(f"Error: {category} not in {[*possible_categories.keys()]}. Skipping.")
         else:
-            if isinstance(all_possible_categories[category], type([])) and isinstance(num[category], type([])):
+            if isinstance(possible_categories[category], type([])) and isinstance(num[category], type([])):
                 # multiple PDFs in a category
-                for _, pdf in enumerate(all_possible_categories[category]): # Add all PDF to list
+                for _, pdf in enumerate(possible_categories[category]): # Add all PDF to list
                     if pdf not in os.listdir("pdfsrc"):
                         logging.error(f"Error: {pdf} not in pdfsrc. Skipping.")
                     else:
@@ -144,10 +144,10 @@ def handle_team(id, row=None, reserve=False):
                         num_copies_list.append(num[category][_])
             else:
                 # One PDF in a category
-                if all_possible_categories[category] not in os.listdir("pdfsrc"):
-                    logging.error(f"Error: {all_possible_categories[category]} not in pdfsrc. Skipping.")
+                if possible_categories[category] not in os.listdir("pdfsrc"):
+                    logging.error(f"Error: {possible_categories[category]} not in pdfsrc. Skipping.")
                 else:
-                    original_pdfs.append(os.path.join("pdfsrc", all_possible_categories[category]))
+                    original_pdfs.append(os.path.join("pdfsrc", possible_categories[category]))
                     num_copies_list.append(num[category])
     if len(original_pdfs) == 0:
         return
