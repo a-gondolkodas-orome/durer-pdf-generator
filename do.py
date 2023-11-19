@@ -31,51 +31,18 @@ USAGE:
 5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
 '''
 
-possible_categories_2 = {
-    'C kategória': ['C.pdf', 'C_valasz.pdf'],
-    'D kategória': ['D.pdf', 'D_valasz.pdf'],
-    'E kategória': 'E.pdf',
-    'E+ kategória': 'Ep.pdf',
-    'F kategória': 'F.pdf',
-    'F+ kategória': ['Fp.pdf', 'Fp_segedlet.pdf'],
-    'K kategória': ['K.pdf', 'kemia_cikk.pdf'],
-    'K+ kategória': ['Kp.pdf', 'kemia_cikk.pdf'],
-    'L kategória': ['L.pdf', 'kemia_cikk.pdf', 'milimeter.pdf'],
-    }
-possible_categories = {
-    'C kategória': ['C_versenyszabalyzat.pdf', 'C.pdf', 'C_valasz.pdf'],
-    'D kategória': ['D_versenyszabalyzat.pdf', 'D.pdf', 'D_valasz.pdf'],
-    'E kategória': ['E_versenyszabalyzat.pdf', 'E.pdf'],
-    'E+ kategória': ['Ep_versenyszabalyzat.pdf', 'Ep.pdf'],
-    'F kategória': ['F_versenyszabalyzat.pdf', 'F.pdf'],
-    'F+ kategória': ['Fp_versenyszabalyzat.pdf', 'Fp.pdf', 'Fp_segedlet.pdf'],
-    'K kategória': ['K_versenyszabalyzat.pdf', 'K.pdf', 'kemia_cikk.pdf'],
-    'K+ kategória': ['Kp_versenyszabalyzat.pdf', 'Kp.pdf', 'kemia_cikk.pdf'],
-    'L kategória': ['L_versenyszabalyzat.pdf', 'L.pdf', 'kemia_cikk.pdf', 'milimeter.pdf'],
-    }
-
-num_2 = {
-    'C kategória': [3,1],
-    'D kategória': [3,1],
-    'E kategória': 3,
-    'E+ kategória': 3,
-    'F kategória': 3,
-    'F+ kategória': [3,1],
-    'K kategória': [1,1],
-    'K+ kategória': [1,1],
-    'L kategória': [1,1,1],
-    }
-num = {
-    'C kategória': [1,3,1],
-    'D kategória': [1,3,1],
-    'E kategória': [1,3],
-    'E+ kategória': [1,3],
-    'F kategória': [1,3],
-    'F+ kategória': [1,3,1],
-    'K kategória': [1,1,1],
-    'K+ kategória': [1,1,0],
-    'L kategória': [1,1,0,1],
-    }
+# TODO: support ranges in a PDF file
+# TODO: refactor it and the latex code
+with open('files.tsv', 'r', encoding="utf8") as f:
+    reader = csv.DictReader(f, delimiter='\t')
+    possible_categories = {}
+    num = {}
+    for row in reader:
+        if row['category'] not in possible_categories.keys():
+            possible_categories[row['category']] = []
+            num[row['category']] = []
+        possible_categories[row['category']].append(row['filename'])
+        num[row['category']].append(int(row['copies']))
 
 category_header = 'Kategória'
 teamname_header = 'Csapatnév'
@@ -164,12 +131,12 @@ def handle_team(id, row=None, reserve=False):
         original_pdfs.append(os.path.join("pdfsrc", "tartalek.pdf"))
         num_copies_list.append(1) # reserve PDF contains all categories in needed number
     else:
-        if category not in possible_categories:
-            logging.error(f"Error: {category} not in {[*possible_categories.keys()]}. Skipping.")
+        if category not in all_possible_categories:
+            logging.error(f"Error: {category} not in {[*all_possible_categories.keys()]}. Skipping.")
         else:
-            if isinstance(possible_categories[category], type([])) and isinstance(num[category], type([])):
+            if isinstance(all_possible_categories[category], type([])) and isinstance(num[category], type([])):
                 # multiple PDFs in a category
-                for _, pdf in enumerate(possible_categories[category]): # Add all PDF to list
+                for _, pdf in enumerate(all_possible_categories[category]): # Add all PDF to list
                     if pdf not in os.listdir("pdfsrc"):
                         logging.error(f"Error: {pdf} not in pdfsrc. Skipping.")
                     else:
@@ -177,10 +144,10 @@ def handle_team(id, row=None, reserve=False):
                         num_copies_list.append(num[category][_])
             else:
                 # One PDF in a category
-                if possible_categories[category] not in os.listdir("pdfsrc"):
-                    logging.error(f"Error: {possible_categories[category]} not in pdfsrc. Skipping.")
+                if all_possible_categories[category] not in os.listdir("pdfsrc"):
+                    logging.error(f"Error: {all_possible_categories[category]} not in pdfsrc. Skipping.")
                 else:
-                    original_pdfs.append(os.path.join("pdfsrc", possible_categories[category]))
+                    original_pdfs.append(os.path.join("pdfsrc", all_possible_categories[category]))
                     num_copies_list.append(num[category])
     if len(original_pdfs) == 0:
         return

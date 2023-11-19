@@ -4,3 +4,4 @@ target
 texput.log
 pdfsrc
 *.tsv
+.venv
