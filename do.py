@@ -31,25 +31,50 @@ USAGE:
 5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
 '''
 
-possible_categories = {
-    'C kategória': ['proba.pdf', 'proba2.pdf'],
-    'D kategória': 'D_vegleges_v2.pdf',
-    'E kategória': 'E_vegleges.pdf',
-    'E+ kategória': 'Eplusz_vegleges.pdf',
-    'F kategória': 'F2021.pdf',
-    'F+ kategória': 'Fpluß2021.pdf',
-    'K kategória': '15IK-es-cikk.pdf',
-    'K+ kategória': '15IKplusz-es-cikk.pdf',
+possible_categories_2 = {
+    'C kategória': ['C.pdf', 'C_valasz.pdf'],
+    'D kategória': ['D.pdf', 'D_valasz.pdf'],
+    'E kategória': 'E.pdf',
+    'E+ kategória': 'Ep.pdf',
+    'F kategória': 'F.pdf',
+    'F+ kategória': ['Fp.pdf', 'Fp_segedlet.pdf'],
+    'K kategória': ['K.pdf', 'kemia_cikk.pdf'],
+    'K+ kategória': ['Kp.pdf', 'kemia_cikk.pdf'],
+    'L kategória': ['L.pdf', 'kemia_cikk.pdf', 'milimeter.pdf'],
     }
-num = {
+possible_categories = {
+    'C kategória': ['C_versenyszabalyzat.pdf', 'C.pdf', 'C_valasz.pdf'],
+    'D kategória': ['D_versenyszabalyzat.pdf', 'D.pdf', 'D_valasz.pdf'],
+    'E kategória': ['E_versenyszabalyzat.pdf', 'E.pdf'],
+    'E+ kategória': ['Ep_versenyszabalyzat.pdf', 'Ep.pdf'],
+    'F kategória': ['F_versenyszabalyzat.pdf', 'F.pdf'],
+    'F+ kategória': ['Fp_versenyszabalyzat.pdf', 'Fp.pdf', 'Fp_segedlet.pdf'],
+    'K kategória': ['K_versenyszabalyzat.pdf', 'K.pdf', 'kemia_cikk.pdf'],
+    'K+ kategória': ['Kp_versenyszabalyzat.pdf', 'Kp.pdf', 'kemia_cikk.pdf'],
+    'L kategória': ['L_versenyszabalyzat.pdf', 'L.pdf', 'kemia_cikk.pdf', 'milimeter.pdf'],
+    }
+
+num_2 = {
     'C kategória': [3,1],
-    'D kategória': 3,
+    'D kategória': [3,1],
     'E kategória': 3,
     'E+ kategória': 3,
     'F kategória': 3,
-    'F+ kategória': 3,
-    'K kategória': 1,
-    'K+ kategória': 1,
+    'F+ kategória': [3,1],
+    'K kategória': [1,1],
+    'K+ kategória': [1,1],
+    'L kategória': [1,1,1],
+    }
+num = {
+    'C kategória': [1,3,1],
+    'D kategória': [1,3,1],
+    'E kategória': [1,3],
+    'E+ kategória': [1,3],
+    'F kategória': [1,3],
+    'F+ kategória': [1,3,1],
+    'K kategória': [1,1,1],
+    'K+ kategória': [1,1,0],
+    'L kategória': [1,1,0,1],
     }
 
 category_header = 'Kategória'
@@ -163,6 +188,8 @@ def handle_team(id, row=None, reserve=False):
     # Instantiate templates
     # compile TEX file into PDF
     for pdf_number,original_pdf in enumerate(original_pdfs):
+        if num_copies_list[pdf_number] == 0:
+            break
         output_pdf = os.path.join("target", place, f"{ids}-{pdf_number}.pdf")
         logging.info(f'Adding team {teamname} ({category} {place} #{ids}) {original_pdf} -> {output_pdf} (x{num_copies_list[pdf_number]})')
         try:
