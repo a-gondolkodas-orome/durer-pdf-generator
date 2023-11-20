@@ -5,7 +5,7 @@ import shutil
 import argparse
 from typing import List
 
-from PyPDF2 import PdfFileWriter, PdfFileReader #type:ignore
+from PyPDF2 import PdfWriter, PdfReader #type:ignore
 import io
 from reportlab.pdfgen import canvas             #type:ignore
 from reportlab.lib.pagesizes import A4          #type:ignore
@@ -41,8 +41,14 @@ with open('files.tsv', 'r', encoding="utf8") as f:
         if row['category'] not in possible_categories.keys():
             possible_categories[row['category']] = []
             num[row['category']] = []
-        possible_categories[row['category']].append(row['filename'])
-        num[row['category']].append(int(row['copies']))
+        if int(row['copies']) > 0:
+            possible_categories[row['category']].append(row['filename'])
+            num[row['category']].append(int(row['copies']))
+            if row["plan"] == "1":
+                possible_categories[row['category']].append("blank.pdf")
+                num[row['category']].append(1)
+
+print(possible_categories)
 
 category_header = 'Kategória'
 teamname_header = 'Csapatnév'
@@ -74,15 +80,15 @@ def writeover(input_fn, output_fn, data):
 
     # Move to the beginning of the StringIO buffer
     packet.seek(0)
-    new_pdf = PdfFileReader(packet)
+    new_pdf = PdfReader(packet)
     # Read your existing PDF
-    existing_pdf = PdfFileReader(open(input_fn, "rb"))
-    output = PdfFileWriter()
+    existing_pdf = PdfReader(open(input_fn, "rb"))
+    output = PdfWriter()
     # Add the "watermark" (which is the new pdf) on the existing page
-    for i in range(existing_pdf.getNumPages()):
-        page = existing_pdf.getPage(i)
-        page.mergePage(new_pdf.getPage(0))
-        output.addPage(page)
+    for i in range(len(existing_pdf.pages)):
+        page = existing_pdf.pages[i]
+        page.merge_page(new_pdf.pages[0])
+        output.add_page(page)
     # Finally, write "output" to a real file
     outputStream = open(output_fn, "wb")
     output.write(outputStream)
