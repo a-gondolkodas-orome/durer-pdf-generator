@@ -163,7 +163,7 @@ def handle_team(id, row=None, reserve=False):
     for pdf_number,original_pdf in enumerate(original_pdfs):
         if num_copies_list[pdf_number] == 0:
             break
-        output_pdf = os.path.join("target", place, f"{ids}-{pdf_number}.pdf")
+        output_pdf = os.path.join("target", place, f"{ids}-{str(pdf_number).zfill(2)}.pdf")
         logging.info(f'Adding team {teamname} ({category} {place} #{ids}) {original_pdf} -> {output_pdf} (x{num_copies_list[pdf_number]})')
         try:
                 writeover0(original_pdf, output_pdf, csapatnev=sanitize_teamname(teamname), helyszin=place)
@@ -175,8 +175,8 @@ def handle_team(id, row=None, reserve=False):
         for _ in range(1, num_copies):
             copy_counter += 1
             shutil.copy(
-                os.path.join('target', place, f"{ids}-{pdf_number}.pdf"),
-                os.path.join('target', place, f"{ids}-{pdf_number}-{copy_counter}.pdf")
+                os.path.join('target', place, f"{ids}-{str(pdf_number).zfill(2)}.pdf"),
+                os.path.join('target', place, f"{ids}-{str(pdf_number).zfill(2)}-{copy_counter}.pdf")
             )
 
 def main():
