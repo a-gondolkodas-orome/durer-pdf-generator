@@ -32,7 +32,9 @@ USAGE:
 '''
 
 # TODO: support ranges in a PDF file
+# TODO: support two-sided printing
 # TODO: refactor it and the latex code
+# TODO: throw an error if a PDF file is not in A4 format.
 with open('files.tsv', 'r', encoding="utf8") as f:
     reader = csv.DictReader(f, delimiter='\t')
     possible_categories = {}
@@ -44,9 +46,9 @@ with open('files.tsv', 'r', encoding="utf8") as f:
         if int(row['copies']) > 0:
             possible_categories[row['category']].append(row['filename'])
             num[row['category']].append(int(row['copies']))
-            if row["plan"] == "1":
-                possible_categories[row['category']].append("blank.pdf")
-                num[row['category']].append(1)
+#            if row["plan"] == "1":
+#                possible_categories[row['category']].append("blank.pdf")
+#                num[row['category']].append(1)
 
 print(possible_categories)
 
@@ -68,6 +70,8 @@ def writeover(input_fn, output_fn, data):
     can.setFont('MySerif', 10)
     # work-around for arabic.
     # HACK: Check for exact team name
+    # TODO: C₈H₁₀N₄O₂
+    # TODO: pi
     if "نحن أذكياء جدا" in data:
         can.setFont('Arab', 10)
         can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
@@ -108,7 +112,7 @@ def sanitize_teamname(s):
     return s
 
 def writeover0(input_fn, output_pdf, csapatnev, helyszin):
-    writeover(input_fn, output_pdf, f"{csapatnev} ({helyszin})")
+    writeover(input_fn, output_pdf, f"{csapatnev}") # TODO refactor this
 
 def lpad(s, n):
     s = str(s)
