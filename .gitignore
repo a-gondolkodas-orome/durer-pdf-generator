@@ -5,3 +5,4 @@ texput.log
 pdfsrc
 *.tsv
 .venv
+*.pdf
