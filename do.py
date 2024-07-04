@@ -29,12 +29,13 @@ USAGE:
   - This needs `poppler`, which contains the `pdfunite` binary.
   - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
 5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
+6) If you want to create two-sided prining compatible outputs then use the --twosided option
 '''
 
-# TODO: support ranges in a PDF file
-# TODO: support two-sided printing
-# TODO: refactor it and the latex code
-# TODO: throw an error if a PDF file is not in A4 format.
+# TODO: legyen opció, hogy üres olal hozzáadása helyett az utolsó oldalt rakja az "egyoldalas" kupacba
+# TODO: refactor it and the latex code -> szebb legyen a kód, kísérőlevél körlevelezés itt, ne latexben
+# TODO: throw an error if a PDF file is not in A4 format. -> ne fusson le csak úgy. esetleg --force as an argument
+# TODO: nagyon hosszú csapatneveket trim-elni
 with open('files.tsv', 'r', encoding="utf8") as f:
     reader = csv.DictReader(f, delimiter='\t')
     possible_categories = {}
@@ -45,15 +46,12 @@ with open('files.tsv', 'r', encoding="utf8") as f:
             num[row['category']] = []
         if int(row['copies']) > 0:
             possible_categories[row['category']].append(row['filename'])
-            num[row['category']].append(int(row['copies']))
-#            if row["plan"] == "1":
-#                possible_categories[row['category']].append("blank.pdf")
-#                num[row['category']].append(1)
+						num[row['category']].append(int(row['copies']))
 
 print(possible_categories)
 
 category_header = 'Kategória'
-teamname_header = 'Csapatnév'
+teamname_header = 'Csapatnév' # ez igazából nem a csapatnév, hanem a csapatnév + helyszín + terem
 place_header = 'Helyszín'
 
 from reportlab.pdfbase.ttfonts import TTFont #type:ignore
@@ -61,8 +59,7 @@ from reportlab.pdfbase.ttfonts import TTFont #type:ignore
 pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))
 pdfmetrics.registerFont(TTFont('Arab', 'fonts/noto/NotoNaskhArabic-Regular.ttf'))
 
-
-def writeover(input_fn, output_fn, data):
+def writeover(input_fn, output_fn, data, twosided=False):
     packet = io.BytesIO()
     # Create a new PDF with Reportlab
     can = canvas.Canvas(packet, pagesize=A4)
@@ -93,6 +90,11 @@ def writeover(input_fn, output_fn, data):
         page = existing_pdf.pages[i]
         page.merge_page(new_pdf.pages[0])
         output.add_page(page)
+		
+		# add blank page if the document has an odd number of pages
+    if twosided and (len(existing_pdf.pages) % 2 == 1):
+        output.add_blank_page()
+
     # Finally, write "output" to a real file
     outputStream = open(output_fn, "wb")
     output.write(outputStream)
@@ -111,9 +113,6 @@ def initialize_output_directories():
 def sanitize_teamname(s):
     return s
 
-def writeover0(input_fn, output_pdf, csapatnev, helyszin):
-    writeover(input_fn, output_pdf, f"{csapatnev}") # TODO refactor this
-
 def lpad(s, n):
     s = str(s)
     l = len(s)
@@ -123,7 +122,7 @@ def lpad(s, n):
 
 all_places:List[str] = []
 
-def handle_team(id, row=None, reserve=False):
+def handle_team(id, row=None, reserve=False, twosided=False):
     ids = lpad(id,3)
     logging.debug(f'Adding new team')
     category = row[category_header]
@@ -170,7 +169,7 @@ def handle_team(id, row=None, reserve=False):
         output_pdf = os.path.join("target", place, f"{ids}-{str(pdf_number).zfill(2)}.pdf")
         logging.info(f'Adding team {teamname} ({category} {place} #{ids}) {original_pdf} -> {output_pdf} (x{num_copies_list[pdf_number]})')
         try:
-                writeover0(original_pdf, output_pdf, csapatnev=sanitize_teamname(teamname), helyszin=place)
+                writeover(original_pdf, output_pdf, sanitize_teamname(teamname), twosided)
         except Exception:
             logging.error(f"Error happened while writing over {original_pdf}")
             raise
@@ -199,8 +198,10 @@ USAGE:
   - This needs `poppler`, which contains the `pdfunite` binary.
   - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
 5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
+6) If you want to create two-sided prining compatible outputs then use the --twosided option
 """)
     parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
+    parser.add_argument("--twosided", action="store_true")
     parser.add_argument("tsvfile")
     args = parser.parse_args()
     logging.basicConfig(level=args.loglevel)
@@ -214,7 +215,7 @@ USAGE:
             if len(set(reader.fieldnames)) != len(reader.fieldnames):
                 pass#raise ValueError("Duplicate fieldname! Not going to proceed! Fix team table")
             for row in reader:
-                handle_team(id, row)
+                handle_team(id, row, twosided=args.twosided)
                 id += 1
             # reserve for every place. In separately generated PDF.
 #            for place in all_places:
