@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import argparse
+import sys
 from typing import List
 
 from PyPDF2 import PdfWriter, PdfReader #type:ignore
@@ -12,8 +13,16 @@ from reportlab.lib.pagesizes import A4          #type:ignore
 
 from reportlab.pdfbase import pdfmetrics        #type:ignore
 
-
-
+def checkA4(path):
+    if path in os.listdir("pdfsrc"):
+        pdf = PdfReader(open(os.path.join("pdfsrc",path), "rb"))
+        for i in range(len(pdf.pages)):
+            width = pdf.pages[i].mediabox.width
+            height = pdf.pages[i].mediabox.height
+            tolerance = 1
+            if (abs(width-595)>tolerance or abs(height-842)>tolerance):
+                return False
+    return True
 '''
 USAGE:
 0) Copy PDF files which need to be compiled in `pdfsrc/`.
@@ -34,7 +43,6 @@ USAGE:
 
 # TODO: legyen opció, hogy üres olal hozzáadása helyett az utolsó oldalt rakja az "egyoldalas" kupacba
 # TODO: refactor it and the latex code -> szebb legyen a kód, kísérőlevél körlevelezés itt, ne latexben
-# TODO: throw an error if a PDF file is not in A4 format. -> ne fusson le csak úgy. esetleg --force as an argument
 # TODO: nagyon hosszú csapatneveket trim-elni
 with open('files.tsv', 'r', encoding="utf8") as f:
     reader = csv.DictReader(f, delimiter='\t')
@@ -46,7 +54,9 @@ with open('files.tsv', 'r', encoding="utf8") as f:
             num[row['category']] = []
         if int(row['copies']) > 0:
             possible_categories[row['category']].append(row['filename'])
-						num[row['category']].append(int(row['copies']))
+            num[row['category']].append(int(row['copies']))
+            if(not checkA4(row['filename'])):  # if there is a page in the input files which is not of dimension A4, exit
+                sys.exit(f"ERROR: in the file {row['filename']} there is a page of dimension different to A4.")
 
 print(possible_categories)
 
@@ -121,6 +131,20 @@ def lpad(s, n):
     return s
 
 all_places:List[str] = []
+
+#def checkA4(path):
+#    print("ok")
+#    if path in os.listdir("pdfsrc"):
+#        pdf = PdfReader(open(os.path.join("pdfsrc",pdf)))
+#        for i in range(len(pdf.pages)):
+#            width = pdf.pages[i].width
+#            height = pdf.pages[i].height
+#            tolerance = 10
+#            print(f"width = {width}, height = {height}")
+#            #if (abs(width-595)>tolerance or abs(height-842)>tolerance):
+#            #    return False
+#    return True
+
 
 def handle_team(id, row=None, reserve=False, twosided=False):
     ids = lpad(id,3)
