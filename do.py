@@ -61,6 +61,7 @@ def init_categories(args):
         reader = csv.DictReader(f, delimiter='\t')
         args.possible_categories = {}
         args.num = {}
+        allIsA4 = True
         for row in reader:
             if row['category'] not in args.possible_categories.keys():
                 args.possible_categories[row['category']] = []
@@ -69,7 +70,10 @@ def init_categories(args):
                 args.possible_categories[row['category']].append(row['filename'])
                 args.num[row['category']].append(int(row['copies']))
                 if(not (checkA4(row['filename']) or  args.forced)):  # if there is a page in the input files which is not of dimension A4, exit
-                    sys.exit(f"ERROR: in the file {row['filename']} there is a page of dimension different to A4.")
+                    allIsA4 = False
+                    print(f"ERROR: in the file {row['filename']} there is a page of dimension different to A4.")
+        if not allIsA4:
+            sys.exit()
 
     print(args.possible_categories)
 
@@ -84,6 +88,7 @@ def writeover(input_fn, output_fn, data, twosided=False):
     # HACK: Check for exact team name
     # TODO: C₈H₁₀N₄O₂
     # TODO: pi
+	# az arab karakterek benne vannak UNICODE-ban, így az alapján lehet őket a text-ben detektálni függvénnyel.
     if "نحن أذكياء جدا" in data:
         can.setFont('Arab', 10)
         can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
