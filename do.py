@@ -88,14 +88,15 @@ def writeover(input_fn, output_fn, data, twosided=False):
     # HACK: Check for exact team name
     # TODO: C₈H₁₀N₄O₂
     # TODO: pi
-	# az arab karakterek benne vannak UNICODE-ban, így az alapján lehet őket a text-ben detektálni függvénnyel.
-    if "نحن أذكياء جدا" in data:
-        can.setFont('Arab', 10)
-        can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
-        can.setFont('MySerif', 10)
-        can.drawString(100, -30, data[len("نحن أذكياء جدا"):])
-    else:
-        can.drawString(40, -30, data)
+	 # az arab karakterek benne vannak UNICODE-ban, így az alapján lehet őket a text-ben detektálni függvénnyel.
+    #if "نحن أذكياء جدا" in data:
+    #    can.setFont('Arab', 10)
+    #    can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
+    #    can.setFont('MySerif', 10)
+    #    can.drawString(100, -30, data[len("نحن أذكياء جدا"):])
+    #else:
+    #    can.drawString(40, -30, data)
+    can.drawString(40, -30, data)
     can.showPage()
     can.save()
 
@@ -209,8 +210,8 @@ def main():
     # TODO: refactor it and the latex code -> szebb legyen a kód, kísérőlevél körlevelezés itt, ne latexben
 
 
-    pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))
-    pdfmetrics.registerFont(TTFont('Arab', 'fonts/noto/NotoNaskhArabic-Regular.ttf'))
+    pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))    # registers latin-based script
+    #pdfmetrics.registerFont(TTFont('Arab', 'fonts/noto/NotoNaskhArabic-Regular.ttf'))    # registers arabic script
 
 #    all_places:List[str] = []
 
