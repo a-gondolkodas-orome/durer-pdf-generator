@@ -58,25 +58,25 @@ def set_headers(args):
     args.place_header = 'Helyszín'
 
 def init_categories(args):
+    args.possible_categories = {}
+    args.num = {}
+    non_a4_pages = {}
     with open('files.tsv', 'r', encoding="utf8") as f:
         reader = csv.DictReader(f, delimiter='\t')
-        args.possible_categories = {}
-        args.num = {}
-        non_a4_pages = {}
-        for row in reader:
-            if row['category'] not in args.possible_categories.keys():
-                args.possible_categories[row['category']] = []
-                args.num[row['category']] = []
-            if int(row['copies']) > 0:
-                args.possible_categories[row['category']].append(row['filename'])
-                args.num[row['category']].append(int(row['copies']))
-                current_non_a4_pages = get_non_a4_pages(row['filename'])
-                if(len(current_non_a4_pages) > 0):
-                    non_a4_pages[row['filename']] = current_non_a4_pages
-        if len(non_a4_pages) > 0 and not args.force:
-            raise Exception(f"Non-A4 pages found in the following files and pages: {non_a4_pages}. If you want to proceed, use the --force option.")
+    for row in reader:
+        if row['category'] not in args.possible_categories.keys():
+            args.possible_categories[row['category']] = []
+            args.num[row['category']] = []
+        if int(row['copies']) > 0:
+            args.possible_categories[row['category']].append(row['filename'])
+            args.num[row['category']].append(int(row['copies']))
+            current_non_a4_pages = get_non_a4_pages(row['filename'])
+            if(len(current_non_a4_pages) > 0):
+                non_a4_pages[row['filename']] = current_non_a4_pages
+    if len(non_a4_pages) > 0 and not args.force:
+        raise Exception(f"Non-A4 pages found in the following files and pages: {non_a4_pages}. If you want to proceed, use the --force option.")
 
-    print(args.possible_categories)
+    print("Categories: ", args.possible_categories)
 
 
 def writeover(input_fn, output_fn, data, twosided=False):
