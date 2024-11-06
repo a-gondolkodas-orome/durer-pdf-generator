@@ -14,16 +14,17 @@ from reportlab.lib.pagesizes import A4          #type:ignore
 from reportlab.pdfbase import pdfmetrics        #type:ignore
 from reportlab.pdfbase.ttfonts import TTFont #type:ignore
 
-def checkA4(path):
+def get_non_a4_pages(path):
+    non_a4_pages = []
     if path in os.listdir("pdfsrc"):
-        pdf = PdfReader(open(os.path.join("pdfsrc",path), "rb"))
+        pdf = PdfReader(open(os.path.join("pdfsrc", path), "rb"))
         for i in range(len(pdf.pages)):
             width = pdf.pages[i].mediabox.width
             height = pdf.pages[i].mediabox.height
             tolerance = 1
-            if (abs(width-595)>tolerance or abs(height-842)>tolerance):
-                return False
-    return True
+            if abs(width - 595) > tolerance or abs(height - 842) > tolerance:
+                non_a4_pages.append(i + 1)  # Page numbers are 1-based
+    return non_a4_pages
 
 def parsing():
     parser = argparse.ArgumentParser(usage="""
@@ -42,11 +43,11 @@ USAGE:
   - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
 5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
 6) If you want to create two-sided prining compatible outputs then use the --twosided option
-7) by default, the script terminates if any pdf page is not of dimension A4. If you not want to apply this check use the option --forced
+7) by default, the script terminates if any pdf page is not of dimension A4. If you not want to apply this check use the option --force
 """)
     parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
     parser.add_argument("--twosided", action="store_true")
-    parser.add_argument("--forced", action="store_true")
+    parser.add_argument("--force", action="store_true")
     parser.add_argument("tsvfile")
     return parser.parse_args()
 
@@ -61,7 +62,7 @@ def init_categories(args):
         reader = csv.DictReader(f, delimiter='\t')
         args.possible_categories = {}
         args.num = {}
-        allIsA4 = True
+        non_a4_pages = {}
         for row in reader:
             if row['category'] not in args.possible_categories.keys():
                 args.possible_categories[row['category']] = []
@@ -69,11 +70,11 @@ def init_categories(args):
             if int(row['copies']) > 0:
                 args.possible_categories[row['category']].append(row['filename'])
                 args.num[row['category']].append(int(row['copies']))
-                if(not (checkA4(row['filename']) or  args.forced)):  # if there is a page in the input files which is not of dimension A4, exit
-                    allIsA4 = False
-                    print(f"ERROR: in the file {row['filename']} there is a page of dimension different to A4.")
-        if not allIsA4:
-            sys.exit()
+                current_non_a4_pages = get_non_a4_pages(row['filename'])
+                if(len(current_non_a4_pages) > 0):
+                    non_a4_pages[row['filename']] = current_non_a4_pages
+        if len(non_a4_pages) > 0 and not args.force:
+            raise Exception(f"Non-A4 pages found in the following files and pages: {non_a4_pages}. If you want to proceed, use the --force option.")
 
     print(args.possible_categories)
 
