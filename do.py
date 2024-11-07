@@ -29,24 +29,15 @@ def get_non_a4_pages(path):
     return non_a4_pages
 
 def parsing():
-    parser = argparse.ArgumentParser(usage="""
-USAGE:
-0) Copy PDF files which need to be compiled in `pdfsrc/`.
-1) Download team data in `Tab-separated value (.tsv, current sheet)` format to a file e.g. (`local.tsv`)
-  - There is a live version for XV, ask for link. (3 columns for teamname, category and place)
-2) At the start of `do.py` file, fill out the fields.
-  - `possible_categories`: map category (name as in the TSV) to the corresponding main TEX file
-  - `*_header`: The TSV file's header name which contains teamname, category and place
-3) Run `python do.py local.tsv`
-  - This creates for all places (here `VPG`) files like `target/VPG/105.pdf`.
-  - You might want to check out the generated PDFs for the weirder teamnames.
-4) Run `./merger.sh`
-  - This needs `poppler`, which contains the `pdfunite` binary.
-  - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
-5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
-6) If you want to create two-sided prining compatible outputs then use the --twosided option
-7) by default, the script terminates if any pdf page is not of dimension A4. If you not want to apply this check use the option --force
-""")
+    parser = argparse.ArgumentParser(
+        usage="""%(prog)s team_data_tsv_path [options]
+team_data_tsv_path: path to the TSV file containing the team data. 
+Options:
+    --loglevel [DEBUG|INFO|WARNING|ERROR] (default: INFO)
+    --twosided: add blank page after each odd number of pages (default: False)
+    --force: ignore errors and continue (default: False)"""
+    )
+
     parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
     parser.add_argument("--twosided", action="store_true")
     parser.add_argument("--force", action="store_true")

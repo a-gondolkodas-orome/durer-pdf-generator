@@ -16,6 +16,8 @@ Local contest problems with the teamnames printed in the header.
   - This needs `poppler`, which contains the `pdfunite` binary.
   - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
 5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
+6) If you want to create two-sided prining compatible outputs then use the --twosided option
+7) by default, the script terminates if any pdf page is not of dimension A4. If you not want to apply this check use the option --force
 
 # Local XV. Dürer -- write-up
 
