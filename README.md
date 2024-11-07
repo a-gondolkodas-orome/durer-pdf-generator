@@ -39,3 +39,9 @@ Also, I've prepared the data from teams in Excel (cross-referencing team name+ca
 This merges all PDFs from a single place.
 
 There is a tool `merger.sh` which does this job (see Usage)
+
+## Debug
+
+If some error happened you can try
+- Running in debug level: python do.py --loglevel=DEBUG
+- Checking the output file at target/location/n.tex. Which file failed should be easy to determine.

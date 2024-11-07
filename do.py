@@ -222,13 +222,7 @@ if __name__ == "__main__":
 
     os.makedirs("target", exist_ok=True)
 
-    try:
-        expected_fieldnames = set([args.teamname_header, args.category_header, args.place_header])
-        rows = read_tsv_file(args.team_data_tsv_path, expected_fieldnames)
-        for id, row in tqdm(enumerate(rows), total=len(rows)):
-            handle_team(id, args, row)
-    except Exception as e:
-        print("Some error happened. If it was parsing, try")
-        print("  - Running in debug level: python do.py --loglevel=DEBUG")
-        print("  - Checking the output file at target/location/n.tex. Which file failed should be easy to determine.")
-        raise
+    expected_fieldnames = set([args.teamname_header, args.category_header, args.place_header])
+    rows = read_tsv_file(args.team_data_tsv_path, expected_fieldnames)
+    for id, row in tqdm(enumerate(rows), total=len(rows)):
+        handle_team(id, args, row)
