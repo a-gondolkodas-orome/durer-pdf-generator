@@ -1,18 +1,20 @@
+from collections import defaultdict
 import csv
+# from datetime import datetime
 import logging
 import os
 import shutil
 import argparse
-from typing import List
+# from typing import List
 from tqdm import tqdm
 
-from PyPDF2 import PdfWriter, PdfReader #type:ignore
+from PyPDF2 import PdfWriter, PdfReader
 import io
-from reportlab.pdfgen import canvas             #type:ignore
-from reportlab.lib.pagesizes import A4          #type:ignore
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 
-from reportlab.pdfbase import pdfmetrics        #type:ignore
-from reportlab.pdfbase.ttfonts import TTFont #type:ignore
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 def get_non_a4_pages(path):
     non_a4_pages = []
@@ -58,23 +60,22 @@ def set_headers(args):
     args.place_header = 'Helyszín'
 
 def init_categories(args):
-    args.possible_categories = {}
-    args.num = {}
+    args.possible_categories = defaultdict(list)
+    args.num = defaultdict(list)
     non_a4_pages = {}
     with open('files.tsv', 'r', encoding="utf8") as f:
         reader = csv.DictReader(f, delimiter='\t')
         for row in reader:
-            if row['category'] not in args.possible_categories.keys():
-                args.possible_categories[row['category']] = []
-                args.num[row['category']] = []
             if int(row['copies']) > 0:
                 args.possible_categories[row['category']].append(row['filename'])
                 args.num[row['category']].append(int(row['copies']))
                 current_non_a4_pages = get_non_a4_pages(row['filename'])
                 if(len(current_non_a4_pages) > 0):
                     non_a4_pages[row['filename']] = current_non_a4_pages
+            else:
+                logging.warning(f"Skipping {row['filename']} because copies is expected positive integer, but got {row['copies']}.")
     if len(non_a4_pages) > 0 and not args.force:
-        raise Exception(f"Non-A4 pages found in the following files and pages: {non_a4_pages}. If you want to proceed, use the --force option.")
+        logging.error(f"Non-A4 pages found in the following files and pages: {non_a4_pages}.")
 
 def writeover(input_fn, output_fn, data, twosided=False):
     packet = io.BytesIO()
@@ -119,76 +120,44 @@ def writeover(input_fn, output_fn, data, twosided=False):
     output.write(outputStream)
     outputStream.close()
 
-# I/O
-def get_place_directory(place):
-    return os.path.join('target', place)
-
-def ensure_dir(path):
-    os.makedirs(path, exist_ok=True)
-    
-
-def sanitize_teamname(s):
-    # TODO: nagyon hosszú csapatneveket trim-elni
-    return s
-
 def handle_team(id:str, args, row=None, reserve=False):
-#def handle_team(id, row=None, reserve=False, twosided=False):
-    id = str(id).zfill(3)
+    id_str = str(id).zfill(3)
     logging.debug(f'Adding new team')
     category = row[args.category_header]
     teamname = row[args.teamname_header]
     place = row[args.place_header]
-    dir = os.path.join('target', place)
-    os.makedirs(dir, exist_ok=True)
+    os.makedirs(os.path.join('target', place), exist_ok=True)
 
-    original_pdfs = []
-    num_copies_list = []
-
-    if reserve:
-        original_pdfs.append(os.path.join("pdfsrc", "tartalek.pdf"))
-        num_copies_list.append(1) # reserve PDF contains all categories in needed number
-    else:
-        if category not in args.possible_categories.keys():
-            logging.error(f"Error: {category} not in {[*args.possible_categories.keys()]}. Skipping.")
-            return
-        if isinstance(args.possible_categories[category], type([])) and isinstance(args.num[category], type([])):
-            # multiple PDFs in a category
-            for _, pdf in enumerate(args.possible_categories[category]): # Add all PDF to list
-                if pdf not in os.listdir("pdfsrc"):
-                    logging.error(f"Error: {pdf} not in pdfsrc. Skipping.")
-                else:
-                    original_pdfs.append(os.path.join("pdfsrc", pdf)) 
-                    num_copies_list.append(args.num[category][_])
-        else:
-            # One PDF in a category
-            if args.possible_categories[category] not in os.listdir("pdfsrc"):
-                logging.error(f"Error: {args.possible_categories[category]} not in pdfsrc. Skipping.")
-                return
-
-            original_pdfs.append(os.path.join("pdfsrc", args.possible_categories[category]))
-            num_copies_list.append(args.num[category])
-    if len(original_pdfs) == 0:
+    if category not in args.possible_categories.keys():
+        logging.error(f"'{category}' not in set of possible categories: {[*args.possible_categories.keys()]}. Skipping line {id+2}.")
         return
 
-    # Instantiate templates
-    # compile TEX file into PDF
-    for pdf_number,original_pdf in enumerate(original_pdfs):
-        if num_copies_list[pdf_number] == 0:
-            break
-        output_pdf = os.path.join("target", place, f"{id}-{str(pdf_number).zfill(2)}.pdf")
-        logging.debug(f'Adding team {teamname} ({category} {place} #{id}) {original_pdf} -> {output_pdf} (x{num_copies_list[pdf_number]})')
+    # Prepare the PDFs
+    original_pdfs = []
+    num_copies_list = []
+    for pdf, copies in zip(args.possible_categories[category], args.num[category]):
+        if pdf not in os.listdir("pdfsrc"):
+            logging.error(f"{pdf} not in pdfsrc. Skipping this page in line {id+2}.")
+            continue
+        original_pdfs.append(os.path.join("pdfsrc", pdf))
+        num_copies_list.append(copies)
+
+    # Create the PDFs
+    for pdf_number, original_pdf_path in enumerate(original_pdfs):
+        output_pdf_path = os.path.join("target", place, f"{id_str}-{str(pdf_number).zfill(2)}.pdf")
+        logging.debug(f'Adding team {teamname} ({category} {place} #{id_str}) {original_pdf_path} -> {output_pdf_path} (x{num_copies_list[pdf_number]})')
         try:
-                writeover(original_pdf, output_pdf, sanitize_teamname(teamname), args.twosided)
+            writeover(original_pdf_path, output_pdf_path, teamname, args.twosided)
         except Exception:
-            logging.error(f"Error happened while writing over {original_pdf}")
+            logging.error(f"Error happened while writing over {original_pdf_path}")
             raise
-    for pdf_number,num_copies in enumerate(num_copies_list):
-        copy_counter = 0
-        for _ in range(1, num_copies):
-            copy_counter += 1
+
+    # Copy the PDFs
+    for pdf_number, num_copies in enumerate(num_copies_list):
+        for i in range(1, num_copies):
             shutil.copy(
-                os.path.join('target', place, f"{id}-{str(pdf_number).zfill(2)}.pdf"),
-                os.path.join('target', place, f"{id}-{str(pdf_number).zfill(2)}-{copy_counter}.pdf")
+                os.path.join('target', place, f"{id_str}-{str(pdf_number).zfill(2)}.pdf"),
+                os.path.join('target', place, f"{id_str}-{str(pdf_number).zfill(2)}-{i}.pdf")
             )
 
 def read_tsv_file(team_data_tsv_path, expected_fieldnames):
@@ -201,10 +170,33 @@ def read_tsv_file(team_data_tsv_path, expected_fieldnames):
             rows.append(row)
     return rows
 
+class ErrorRaisingHandler(logging.Handler):
+    def __init__(self, force=False):
+        super().__init__()
+        self.force = force
+    def emit(self, record):
+        if record.levelno == logging.ERROR and not self.force:
+            raise RuntimeError(record.getMessage())
+
+def configure_logging(args):
+    # TODO: save to log file?
+    # os.makedirs("logs", exist_ok=True)
+    # current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # log_filename = os.path.join("logs", f"log_{current_time}.log")
+    logging.basicConfig(
+        level=args.loglevel,
+        # filename=log_filename,
+        # filemode='w',
+        # format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger()
+    logger.addHandler(ErrorRaisingHandler(args.force))
+
 if __name__ == "__main__":
     ###########################################
     # TODO: legyen opció, hogy üres olal hozzáadása helyett az utolsó oldalt rakja az "egyoldalas" kupacba
     # TODO: refactor it and the latex code -> szebb legyen a kód, kísérőlevél körlevelezés itt, ne latexben
+    # TODO: nagyon hosszú csapatneveket trim-elni
 
 
     pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))    # registers latin-based script
@@ -218,7 +210,7 @@ if __name__ == "__main__":
     set_headers(args)
     init_categories(args)
 
-    logging.basicConfig(level=args.loglevel)
+    configure_logging(args)
 
     os.makedirs("target", exist_ok=True)
 
