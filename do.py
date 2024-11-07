@@ -3,8 +3,8 @@ import logging
 import os
 import shutil
 import argparse
-import sys
 from typing import List
+from tqdm import tqdm
 
 from PyPDF2 import PdfWriter, PdfReader #type:ignore
 import io
@@ -48,13 +48,13 @@ USAGE:
     parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
     parser.add_argument("--twosided", action="store_true")
     parser.add_argument("--force", action="store_true")
-    parser.add_argument("tsvfile")
+    parser.add_argument("team_data_tsv_path")
     return parser.parse_args()
 
 def set_headers(args):
     # itt add meg, hogy az input fájlban milyen header nevek szerepelnek
     args.category_header = 'Kategória'
-    args.teamname_header = 'Csapatnév' # ez igazából nem a csapatnév, hanem a csapatnév + helyszín + terem
+    args.teamname_header = 'Rövidített csapatnév (helyszín, terem)' # ez igazából nem a csapatnév, hanem a csapatnév + helyszín + terem
     args.place_header = 'Helyszín'
 
 def init_categories(args):
@@ -63,21 +63,18 @@ def init_categories(args):
     non_a4_pages = {}
     with open('files.tsv', 'r', encoding="utf8") as f:
         reader = csv.DictReader(f, delimiter='\t')
-    for row in reader:
-        if row['category'] not in args.possible_categories.keys():
-            args.possible_categories[row['category']] = []
-            args.num[row['category']] = []
-        if int(row['copies']) > 0:
-            args.possible_categories[row['category']].append(row['filename'])
-            args.num[row['category']].append(int(row['copies']))
-            current_non_a4_pages = get_non_a4_pages(row['filename'])
-            if(len(current_non_a4_pages) > 0):
-                non_a4_pages[row['filename']] = current_non_a4_pages
+        for row in reader:
+            if row['category'] not in args.possible_categories.keys():
+                args.possible_categories[row['category']] = []
+                args.num[row['category']] = []
+            if int(row['copies']) > 0:
+                args.possible_categories[row['category']].append(row['filename'])
+                args.num[row['category']].append(int(row['copies']))
+                current_non_a4_pages = get_non_a4_pages(row['filename'])
+                if(len(current_non_a4_pages) > 0):
+                    non_a4_pages[row['filename']] = current_non_a4_pages
     if len(non_a4_pages) > 0 and not args.force:
         raise Exception(f"Non-A4 pages found in the following files and pages: {non_a4_pages}. If you want to proceed, use the --force option.")
-
-    print("Categories: ", args.possible_categories)
-
 
 def writeover(input_fn, output_fn, data, twosided=False):
     packet = io.BytesIO()
@@ -127,34 +124,22 @@ def get_place_directory(place):
     return os.path.join('target', place)
 
 def ensure_dir(path):
-    if not os.path.isdir(path):
-        os.mkdir(path)
-def initialize_output_directories():
-    ensure_dir('target')
+    os.makedirs(path, exist_ok=True)
+    
 
 def sanitize_teamname(s):
     # TODO: nagyon hosszú csapatneveket trim-elni
     return s
 
-def lpad(s, n):
-    s = str(s)
-    l = len(s)
-    if l < n:
-        return (n-l)*"0"+s
-    return s
-
-
-def handle_team(id, args, row=None, reserve=False):
+def handle_team(id:str, args, row=None, reserve=False):
 #def handle_team(id, row=None, reserve=False, twosided=False):
-    ids = lpad(id,3)
+    id = str(id).zfill(3)
     logging.debug(f'Adding new team')
     category = row[args.category_header]
     teamname = row[args.teamname_header]
     place = row[args.place_header]
-    ensure_dir(get_place_directory(place))
-
-#    if place not in all_places:
-#        all_places.append(place)
+    dir = os.path.join('target', place)
+    os.makedirs(dir, exist_ok=True)
 
     original_pdfs = []
     num_copies_list = []
@@ -163,24 +148,25 @@ def handle_team(id, args, row=None, reserve=False):
         original_pdfs.append(os.path.join("pdfsrc", "tartalek.pdf"))
         num_copies_list.append(1) # reserve PDF contains all categories in needed number
     else:
-        if category not in args.possible_categories:
+        if category not in args.possible_categories.keys():
             logging.error(f"Error: {category} not in {[*args.possible_categories.keys()]}. Skipping.")
-        else:
-            if isinstance(args.possible_categories[category], type([])) and isinstance(args.num[category], type([])):
-                # multiple PDFs in a category
-                for _, pdf in enumerate(args.possible_categories[category]): # Add all PDF to list
-                    if pdf not in os.listdir("pdfsrc"):
-                        logging.error(f"Error: {pdf} not in pdfsrc. Skipping.")
-                    else:
-                        original_pdfs.append(os.path.join("pdfsrc", pdf)) 
-                        num_copies_list.append(args.num[category][_])
-            else:
-                # One PDF in a category
-                if args.possible_categories[category] not in os.listdir("pdfsrc"):
-                    logging.error(f"Error: {args.possible_categories[category]} not in pdfsrc. Skipping.")
+            return
+        if isinstance(args.possible_categories[category], type([])) and isinstance(args.num[category], type([])):
+            # multiple PDFs in a category
+            for _, pdf in enumerate(args.possible_categories[category]): # Add all PDF to list
+                if pdf not in os.listdir("pdfsrc"):
+                    logging.error(f"Error: {pdf} not in pdfsrc. Skipping.")
                 else:
-                    original_pdfs.append(os.path.join("pdfsrc", args.possible_categories[category]))
-                    num_copies_list.append(args.num[category])
+                    original_pdfs.append(os.path.join("pdfsrc", pdf)) 
+                    num_copies_list.append(args.num[category][_])
+        else:
+            # One PDF in a category
+            if args.possible_categories[category] not in os.listdir("pdfsrc"):
+                logging.error(f"Error: {args.possible_categories[category]} not in pdfsrc. Skipping.")
+                return
+
+            original_pdfs.append(os.path.join("pdfsrc", args.possible_categories[category]))
+            num_copies_list.append(args.num[category])
     if len(original_pdfs) == 0:
         return
 
@@ -189,8 +175,8 @@ def handle_team(id, args, row=None, reserve=False):
     for pdf_number,original_pdf in enumerate(original_pdfs):
         if num_copies_list[pdf_number] == 0:
             break
-        output_pdf = os.path.join("target", place, f"{ids}-{str(pdf_number).zfill(2)}.pdf")
-        logging.info(f'Adding team {teamname} ({category} {place} #{ids}) {original_pdf} -> {output_pdf} (x{num_copies_list[pdf_number]})')
+        output_pdf = os.path.join("target", place, f"{id}-{str(pdf_number).zfill(2)}.pdf")
+        logging.debug(f'Adding team {teamname} ({category} {place} #{id}) {original_pdf} -> {output_pdf} (x{num_copies_list[pdf_number]})')
         try:
                 writeover(original_pdf, output_pdf, sanitize_teamname(teamname), args.twosided)
         except Exception:
@@ -201,11 +187,21 @@ def handle_team(id, args, row=None, reserve=False):
         for _ in range(1, num_copies):
             copy_counter += 1
             shutil.copy(
-                os.path.join('target', place, f"{ids}-{str(pdf_number).zfill(2)}.pdf"),
-                os.path.join('target', place, f"{ids}-{str(pdf_number).zfill(2)}-{copy_counter}.pdf")
+                os.path.join('target', place, f"{id}-{str(pdf_number).zfill(2)}.pdf"),
+                os.path.join('target', place, f"{id}-{str(pdf_number).zfill(2)}-{copy_counter}.pdf")
             )
 
-def main():
+def read_tsv_file(team_data_tsv_path, expected_fieldnames):
+    rows = []
+    with open(team_data_tsv_path, 'r', newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f, delimiter='\t', quotechar='"')
+        if set(reader.fieldnames) != expected_fieldnames:
+            raise ValueError("Column names do not match. Expected: %s, got: %s" % (expected_fieldnames, reader.fieldnames))
+        for row in reader:
+            rows.append(row)
+    return rows
+
+if __name__ == "__main__":
     ###########################################
     # TODO: legyen opció, hogy üres olal hozzáadása helyett az utolsó oldalt rakja az "egyoldalas" kupacba
     # TODO: refactor it and the latex code -> szebb legyen a kód, kísérőlevél körlevelezés itt, ne latexben
@@ -224,29 +220,15 @@ def main():
 
     logging.basicConfig(level=args.loglevel)
 
-    initialize_output_directories()
+    os.makedirs("target", exist_ok=True)
 
     try:
-        with open(args.tsvfile, 'r', newline='', encoding='utf-8') as f:
-            reader = csv.DictReader(f, delimiter='\t', quotechar='"')
-            id=0
-            if len(set(reader.fieldnames)) != len(reader.fieldnames):
-                pass#raise ValueError("Duplicate fieldname! Not going to proceed! Fix team table")
-            for row in reader:
-                handle_team(id, args, row)
-                id += 1
-    # reserve for every place. In separately generated PDF.
-#            for place in all_places:
-#                handle_team(id, {
-#                    category_header: 'reserve',
-#                    teamname_header: "TARTALÉK",
-#                    place_header: place
-#                }, reserve=True)
-#                id += 1
-    except Exception:
+        expected_fieldnames = set([args.teamname_header, args.category_header, args.place_header])
+        rows = read_tsv_file(args.team_data_tsv_path, expected_fieldnames)
+        for id, row in tqdm(enumerate(rows), total=len(rows)):
+            handle_team(id, args, row)
+    except Exception as e:
         print("Some error happened. If it was parsing, try")
         print("  - Running in debug level: python do.py --loglevel=DEBUG")
         print("  - Checking the output file at target/location/n.tex. Which file failed should be easy to determine.")
         raise
-
-main()
