@@ -30,7 +30,7 @@ def get_non_a4_pages(path):
 
 def parsing():
     parser = argparse.ArgumentParser(
-        usage="""%(prog)s team_data_tsv_path [options]
+        usage="""%(prog)s files_tsv_path team_data_tsv_path [options]
 team_data_tsv_path: path to the TSV file containing the team data. 
 Options:
     --loglevel [DEBUG|INFO|WARNING|ERROR] (default: INFO)
@@ -41,6 +41,7 @@ Options:
     parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
     parser.add_argument("--twosided", action="store_true")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("files_tsv_path")
     parser.add_argument("team_data_tsv_path")
     return parser.parse_args()
 
@@ -54,7 +55,9 @@ def init_categories(args):
     args.possible_categories = defaultdict(list)
     args.num = defaultdict(list)
     non_a4_pages = {}
-    with open('files.tsv', 'r', encoding="utf8") as f:
+    if not args.files_tsv_path.endswith('.tsv'):
+        logging.error(f"The input file ({args.files_tsv_path}) is not a TSV file.")
+    with open(args.files_tsv_path, 'r', encoding="utf8") as f:
         reader = csv.DictReader(f, delimiter='\t')
         for row in reader:
             if int(row['copies']) > 0:
@@ -153,6 +156,8 @@ def handle_team(id:str, args, row=None, reserve=False):
 
 def read_tsv_file(team_data_tsv_path, expected_fieldnames):
     rows = []
+    if not team_data_tsv_path.endswith('.tsv'):
+        logging.error(f"The input file ({team_data_tsv_path}) is not a TSV file.")
     with open(team_data_tsv_path, 'r', newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f, delimiter='\t', quotechar='"')
         if set(reader.fieldnames) != expected_fieldnames:
@@ -202,6 +207,7 @@ if __name__ == "__main__":
     init_categories(args)
 
     configure_logging(args)
+    check_input_args(args)
 
     os.makedirs("target", exist_ok=True)
 

@@ -1,23 +1,28 @@
-# durer-pdf-generator
-Local contest problems with the teamnames printed in the header.
+# Dürer PDF generator for local contest
+
+This scripts generates PDF files for the local contest. Each team gets a copy of each file in their category with the teamnames printed in the header. The final files are merged into a single PDF file for each location.
 
 ## USAGE:
 
-0) Copy PDF files which need to be compiled in `pdfsrc/`.
-1) Download team data in `Tab-separated value (.tsv, current sheet)` format to a file e.g. (`local.tsv`)
-  - There is a live version for XV, ask for link. (3 columns for teamname, category and place)
-2) At the start of `do.py` file, fill out the fields.
-  - `possible_categories`: map category (name as in the TSV) to the corresponding main TEX file
-  - `*_header`: The TSV file's header name which contains teamname, category and place
-3) Run `python do.py local.tsv`
-  - This creates for all places (here `VPG`) files like `target/VPG/105.pdf`.
-  - You might want to check out the generated PDFs for the weirder teamnames.
+1) **PDF files:** Copy PDF files which need to be compiled in the folder `pdfsrc`.
+2) **Category-wise files:** Create a file like `debug_files.tsv` where you define how many copies of each file should be created for each team in specific category.
+3) **Team datas:** Download team data in `Tab-separated value (.tsv)` format to a file like `debug_teamdatas.tsv`.
+3) Run the script
+```
+python do.py input_tsvs/files.tsv input_tsvs/teamdatas.tsv
+```
+Additional options:
+```
+--loglevel [DEBUG|INFO|WARNING|ERROR] (default: INFO)
+--twosided: add blank page after each odd number of pages (default: False)
+--force: ignore errors and continue (default: False)
+```
+
+- This creates for all places (here `VPG`) files like `target/VPG/105.pdf`.
+- You might want to check out the generated PDFs for the weirder teamnames.
 4) Run `./merger.sh`
   - This needs `poppler`, which contains the `pdfunite` binary.
   - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
-5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
-6) If you want to create two-sided prining compatible outputs then use the --twosided option
-7) by default, the script terminates if any pdf page is not of dimension A4. If you not want to apply this check use the option --force
 
 # Local XV. Dürer -- write-up
 
