@@ -1,6 +1,7 @@
 env
 src
 target
+logs
 texput.log
 pdfsrc
 *.tsv

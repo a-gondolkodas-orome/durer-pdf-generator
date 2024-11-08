@@ -1,68 +1,77 @@
+from collections import defaultdict
 import csv
+# from datetime import datetime
 import logging
 import os
 import shutil
 import argparse
-from typing import List
+# from typing import List
+from tqdm import tqdm
 
-from PyPDF2 import PdfWriter, PdfReader #type:ignore
+from PyPDF2 import PdfWriter, PdfReader
 import io
-from reportlab.pdfgen import canvas             #type:ignore
-from reportlab.lib.pagesizes import A4          #type:ignore
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 
-from reportlab.pdfbase import pdfmetrics        #type:ignore
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
+def get_non_a4_pages(path):
+    non_a4_pages = []
+    if path in os.listdir("pdfsrc"):
+        pdf = PdfReader(open(os.path.join("pdfsrc", path), "rb"))
+        for i in range(len(pdf.pages)):
+            width = pdf.pages[i].mediabox.width
+            height = pdf.pages[i].mediabox.height
+            tolerance = 1
+            if abs(width - 595) > tolerance or abs(height - 842) > tolerance:
+                non_a4_pages.append(i + 1)  # Page numbers are 1-based
+    return non_a4_pages
 
+def parsing():
+    parser = argparse.ArgumentParser(
+        usage="""%(prog)s files_tsv_path team_data_tsv_path [options]
+team_data_tsv_path: path to the TSV file containing the team data. 
+Options:
+    --loglevel [DEBUG|INFO|WARNING|ERROR] (default: INFO)
+    --twosided: add blank page after each odd number of pages (default: False)
+    --force: ignore errors and continue (default: False)"""
+    )
 
-'''
-USAGE:
-0) Copy PDF files which need to be compiled in `pdfsrc/`.
-1) Download team data in `Tab-separated value (.tsv, current sheet)` format to a file e.g. (`local.tsv`)
-  - There is a live version for XV, ask for link. (3 columns for teamname, category and place)
-2) At the start of `do.py` file, fill out the fields.
-  - `possible_categories`: map category (name as in the TSV) to the corresponding main TEX file
-  - `*_header`: The TSV file's header name which contains teamname, category and place
-3) Run `python do.py local.tsv`
-  - This creates for all places (here `VPG`) files like `target/VPG/105.pdf`.
-  - You might want to check out the generated PDFs for the weirder teamnames.
-4) Run `./merger.sh`
-  - This needs `poppler`, which contains the `pdfunite` binary.
-  - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
-5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
-'''
+    parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
+    parser.add_argument("--twosided", action="store_true")
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("files_tsv_path")
+    parser.add_argument("team_data_tsv_path")
+    return parser.parse_args()
 
-# TODO: support ranges in a PDF file
-# TODO: support two-sided printing
-# TODO: refactor it and the latex code
-# TODO: throw an error if a PDF file is not in A4 format.
-with open('files.tsv', 'r', encoding="utf8") as f:
-    reader = csv.DictReader(f, delimiter='\t')
-    possible_categories = {}
-    num = {}
-    for row in reader:
-        if row['category'] not in possible_categories.keys():
-            possible_categories[row['category']] = []
-            num[row['category']] = []
-        if int(row['copies']) > 0:
-            possible_categories[row['category']].append(row['filename'])
-            num[row['category']].append(int(row['copies']))
-#            if row["plan"] == "1":
-#                possible_categories[row['category']].append("blank.pdf")
-#                num[row['category']].append(1)
+def set_headers(args):
+    # itt add meg, hogy az input fájlban milyen header nevek szerepelnek
+    args.category_header = 'Kategória'
+    args.teamname_header = 'Rövidített csapatnév (helyszín, terem)' # ez igazából nem a csapatnév, hanem a csapatnév + helyszín + terem
+    args.place_header = 'Helyszín'
 
-print(possible_categories)
+def init_categories(args):
+    args.possible_categories = defaultdict(list)
+    args.num = defaultdict(list)
+    non_a4_pages = {}
+    if not args.files_tsv_path.endswith('.tsv'):
+        logging.error(f"The input file ({args.files_tsv_path}) is not a TSV file.")
+    with open(args.files_tsv_path, 'r', encoding="utf8") as f:
+        reader = csv.DictReader(f, delimiter='\t')
+        for row in reader:
+            if int(row['copies']) > 0:
+                args.possible_categories[row['category']].append(row['filename'])
+                args.num[row['category']].append(int(row['copies']))
+                current_non_a4_pages = get_non_a4_pages(row['filename'])
+                if(len(current_non_a4_pages) > 0):
+                    non_a4_pages[row['filename']] = current_non_a4_pages
+            else:
+                logging.warning(f"Skipping {row['filename']} because copies is expected positive integer, but got {row['copies']}.")
+    if len(non_a4_pages) > 0 and not args.force:
+        logging.error(f"Non-A4 pages found in the following files and pages: {non_a4_pages}.")
 
-category_header = 'Kategória'
-teamname_header = 'Csapatnév'
-place_header = 'Helyszín'
-
-from reportlab.pdfbase.ttfonts import TTFont #type:ignore
-
-pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))
-pdfmetrics.registerFont(TTFont('Arab', 'fonts/noto/NotoNaskhArabic-Regular.ttf'))
-
-
-def writeover(input_fn, output_fn, data):
+def writeover(input_fn, output_fn, data, twosided=False):
     packet = io.BytesIO()
     # Create a new PDF with Reportlab
     can = canvas.Canvas(packet, pagesize=A4)
@@ -72,13 +81,15 @@ def writeover(input_fn, output_fn, data):
     # HACK: Check for exact team name
     # TODO: C₈H₁₀N₄O₂
     # TODO: pi
-    if "نحن أذكياء جدا" in data:
-        can.setFont('Arab', 10)
-        can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
-        can.setFont('MySerif', 10)
-        can.drawString(100, -30, data[len("نحن أذكياء جدا"):])
-    else:
-        can.drawString(40, -30, data)
+	 # az arab karakterek benne vannak UNICODE-ban, így az alapján lehet őket a text-ben detektálni függvénnyel.
+    #if "نحن أذكياء جدا" in data:
+    #    can.setFont('Arab', 10)
+    #    can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
+    #    can.setFont('MySerif', 10)
+    #    can.drawString(100, -30, data[len("نحن أذكياء جدا"):])
+    #else:
+    #    can.drawString(40, -30, data)
+    can.drawString(40, -30, data)
     can.showPage()
     can.save()
 
@@ -93,141 +104,114 @@ def writeover(input_fn, output_fn, data):
         page = existing_pdf.pages[i]
         page.merge_page(new_pdf.pages[0])
         output.add_page(page)
+		
+		# add blank page if the document has an odd number of pages
+    if twosided and (len(existing_pdf.pages) % 2 == 1):
+        output.add_blank_page()
+
     # Finally, write "output" to a real file
     outputStream = open(output_fn, "wb")
     output.write(outputStream)
     outputStream.close()
 
-# I/O
-def get_place_directory(place):
-    return os.path.join('target', place)
-
-def ensure_dir(path):
-    if not os.path.isdir(path):
-        os.mkdir(path)
-def initialize_output_directories():
-    ensure_dir('target')
-
-def sanitize_teamname(s):
-    return s
-
-def writeover0(input_fn, output_pdf, csapatnev, helyszin):
-    writeover(input_fn, output_pdf, f"{csapatnev}") # TODO refactor this
-
-def lpad(s, n):
-    s = str(s)
-    l = len(s)
-    if l < n:
-        return (n-l)*"0"+s
-    return s
-
-all_places:List[str] = []
-
-def handle_team(id, row=None, reserve=False):
-    ids = lpad(id,3)
+def handle_team(id:str, args, row=None, reserve=False):
+    id_str = str(id).zfill(3)
     logging.debug(f'Adding new team')
-    category = row[category_header]
-    teamname = row[teamname_header]
-    place = row[place_header]
-    ensure_dir(get_place_directory(place))
+    category = row[args.category_header]
+    teamname = row[args.teamname_header]
+    place = row[args.place_header]
+    os.makedirs(os.path.join('target', place), exist_ok=True)
 
-    if place not in all_places:
-        all_places.append(place)
-
-    original_pdfs = []
-    num_copies_list = []
-
-    if reserve:
-        original_pdfs.append(os.path.join("pdfsrc", "tartalek.pdf"))
-        num_copies_list.append(1) # reserve PDF contains all categories in needed number
-    else:
-        if category not in possible_categories:
-            logging.error(f"Error: {category} not in {[*possible_categories.keys()]}. Skipping.")
-        else:
-            if isinstance(possible_categories[category], type([])) and isinstance(num[category], type([])):
-                # multiple PDFs in a category
-                for _, pdf in enumerate(possible_categories[category]): # Add all PDF to list
-                    if pdf not in os.listdir("pdfsrc"):
-                        logging.error(f"Error: {pdf} not in pdfsrc. Skipping.")
-                    else:
-                        original_pdfs.append(os.path.join("pdfsrc", pdf)) 
-                        num_copies_list.append(num[category][_])
-            else:
-                # One PDF in a category
-                if possible_categories[category] not in os.listdir("pdfsrc"):
-                    logging.error(f"Error: {possible_categories[category]} not in pdfsrc. Skipping.")
-                else:
-                    original_pdfs.append(os.path.join("pdfsrc", possible_categories[category]))
-                    num_copies_list.append(num[category])
-    if len(original_pdfs) == 0:
+    if category not in args.possible_categories.keys():
+        logging.error(f"'{category}' not in set of possible categories: {[*args.possible_categories.keys()]}. Skipping line {id+2}.")
         return
 
-    # Instantiate templates
-    # compile TEX file into PDF
-    for pdf_number,original_pdf in enumerate(original_pdfs):
-        if num_copies_list[pdf_number] == 0:
-            break
-        output_pdf = os.path.join("target", place, f"{ids}-{str(pdf_number).zfill(2)}.pdf")
-        logging.info(f'Adding team {teamname} ({category} {place} #{ids}) {original_pdf} -> {output_pdf} (x{num_copies_list[pdf_number]})')
+    # Prepare the PDFs
+    original_pdfs = []
+    num_copies_list = []
+    for pdf, copies in zip(args.possible_categories[category], args.num[category]):
+        if pdf not in os.listdir("pdfsrc"):
+            logging.error(f"{pdf} not in pdfsrc. Skipping this page in line {id+2}.")
+            continue
+        original_pdfs.append(os.path.join("pdfsrc", pdf))
+        num_copies_list.append(copies)
+
+    # Create the PDFs
+    for pdf_number, original_pdf_path in enumerate(original_pdfs):
+        output_pdf_path = os.path.join("target", place, f"{id_str}-{str(pdf_number).zfill(2)}.pdf")
+        logging.debug(f'Adding team {teamname} ({category} {place} #{id_str}) {original_pdf_path} -> {output_pdf_path} (x{num_copies_list[pdf_number]})')
         try:
-                writeover0(original_pdf, output_pdf, csapatnev=sanitize_teamname(teamname), helyszin=place)
+            writeover(original_pdf_path, output_pdf_path, teamname, args.twosided)
         except Exception:
-            logging.error(f"Error happened while writing over {original_pdf}")
+            logging.error(f"Error happened while writing over {original_pdf_path}")
             raise
-    for pdf_number,num_copies in enumerate(num_copies_list):
-        copy_counter = 0
-        for _ in range(1, num_copies):
-            copy_counter += 1
+
+    # Copy the PDFs
+    for pdf_number, num_copies in enumerate(num_copies_list):
+        for i in range(1, num_copies):
             shutil.copy(
-                os.path.join('target', place, f"{ids}-{str(pdf_number).zfill(2)}.pdf"),
-                os.path.join('target', place, f"{ids}-{str(pdf_number).zfill(2)}-{copy_counter}.pdf")
+                os.path.join('target', place, f"{id_str}-{str(pdf_number).zfill(2)}.pdf"),
+                os.path.join('target', place, f"{id_str}-{str(pdf_number).zfill(2)}-{i}.pdf")
             )
 
-def main():
-    parser = argparse.ArgumentParser(usage="""
-USAGE:
-0) Copy PDF files which need to be compiled in `pdfsrc/`.
-1) Download team data in `Tab-separated value (.tsv, current sheet)` format to a file e.g. (`local.tsv`)
-  - There is a live version for XV, ask for link. (3 columns for teamname, category and place)
-2) At the start of `do.py` file, fill out the fields.
-  - `possible_categories`: map category (name as in the TSV) to the corresponding main TEX file
-  - `*_header`: The TSV file's header name which contains teamname, category and place
-3) Run `python do.py local.tsv`
-  - This creates for all places (here `VPG`) files like `target/VPG/105.pdf`.
-  - You might want to check out the generated PDFs for the weirder teamnames.
-4) Run `./merger.sh`
-  - This needs `poppler`, which contains the `pdfunite` binary.
-  - This creates `target/VPG.pdf` from all files in `target/VPG/*.pdf`.
-5) You might need to tweak PDF overwrite generation in `overwrite` for special teamnames.
-""")
-    parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
-    parser.add_argument("tsvfile")
-    args = parser.parse_args()
-    logging.basicConfig(level=args.loglevel)
+def read_tsv_file(team_data_tsv_path, expected_fieldnames):
+    rows = []
+    if not team_data_tsv_path.endswith('.tsv'):
+        logging.error(f"The input file ({team_data_tsv_path}) is not a TSV file.")
+    with open(team_data_tsv_path, 'r', newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f, delimiter='\t', quotechar='"')
+        if set(reader.fieldnames) != expected_fieldnames:
+            raise ValueError("Column names do not match. Expected: %s, got: %s" % (expected_fieldnames, reader.fieldnames))
+        for row in reader:
+            rows.append(row)
+    return rows
 
-    initialize_output_directories()
+class ErrorRaisingHandler(logging.Handler):
+    def __init__(self, force=False):
+        super().__init__()
+        self.force = force
+    def emit(self, record):
+        if record.levelno == logging.ERROR and not self.force:
+            raise RuntimeError(record.getMessage())
 
-    try:
-        with open(args.tsvfile, 'r', newline='', encoding='utf-8') as f:
-            reader = csv.DictReader(f, delimiter='\t', quotechar='"')
-            id=0
-            if len(set(reader.fieldnames)) != len(reader.fieldnames):
-                pass#raise ValueError("Duplicate fieldname! Not going to proceed! Fix team table")
-            for row in reader:
-                handle_team(id, row)
-                id += 1
-            # reserve for every place. In separately generated PDF.
-#            for place in all_places:
-#                handle_team(id, {
-#                    category_header: 'reserve',
-#                    teamname_header: "TARTALÉK",
-#                    place_header: place
-#                }, reserve=True)
-#                id += 1
-    except Exception:
-        print("Some error happened. If it was parsing, try")
-        print("  - Running in debug level: python do.py --loglevel=DEBUG")
-        print("  - Checking the output file at target/location/n.tex. Which file failed should be easy to determine.")
-        raise
+def configure_logging(args):
+    # TODO: save to log file?
+    # os.makedirs("logs", exist_ok=True)
+    # current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # log_filename = os.path.join("logs", f"log_{current_time}.log")
+    logging.basicConfig(
+        level=args.loglevel,
+        # filename=log_filename,
+        # filemode='w',
+        # format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger()
+    logger.addHandler(ErrorRaisingHandler(args.force))
 
-main()
+if __name__ == "__main__":
+    ###########################################
+    # TODO: legyen opció, hogy üres olal hozzáadása helyett az utolsó oldalt rakja az "egyoldalas" kupacba
+    # TODO: refactor it and the latex code -> szebb legyen a kód, kísérőlevél körlevelezés itt, ne latexben
+    # TODO: nagyon hosszú csapatneveket trim-elni
+
+
+    pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))    # registers latin-based script
+    #pdfmetrics.registerFont(TTFont('Arab', 'fonts/noto/NotoNaskhArabic-Regular.ttf'))    # registers arabic script
+
+#    all_places:List[str] = []
+
+    ############################################
+    
+    args = parsing()
+    set_headers(args)
+    init_categories(args)
+
+    configure_logging(args)
+    check_input_args(args)
+
+    os.makedirs("target", exist_ok=True)
+
+    expected_fieldnames = set([args.teamname_header, args.category_header, args.place_header])
+    rows = read_tsv_file(args.team_data_tsv_path, expected_fieldnames)
+    for id, row in tqdm(enumerate(rows), total=len(rows)):
+        handle_team(id, args, row)
