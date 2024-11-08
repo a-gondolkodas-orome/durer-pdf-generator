@@ -130,7 +130,7 @@ def handle_team(id:str, args, row=None, reserve=False):
     original_pdfs = []
     num_copies_list = []
     for pdf, copies in zip(args.possible_categories[category], args.num[category]):
-        if pdf not in os.listdir("pdfsrc"):
+        if not os.path.exists(os.path.join("pdfsrc", pdf)):
             logging.error(f"{pdf} not in pdfsrc. Skipping this page in line {id+2}.")
             continue
         original_pdfs.append(os.path.join("pdfsrc", pdf))
@@ -207,7 +207,6 @@ if __name__ == "__main__":
     init_categories(args)
 
     configure_logging(args)
-    check_input_args(args)
 
     os.makedirs("target", exist_ok=True)
 
