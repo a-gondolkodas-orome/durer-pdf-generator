@@ -26,6 +26,7 @@ Additional options:
 --loglevel [DEBUG|INFO|WARNING|ERROR] (default: INFO)
 --twosided: add blank page after each odd number of pages (default: False)
 --force: ignore errors and continue (default: False)
+--from_line [line_number]: start from this line in the team data file (default: 1)
 ```
 
 This creates for all places (here `Budapest, VPG`) files like `target/Budapest, VPG/035-00.pdf`.

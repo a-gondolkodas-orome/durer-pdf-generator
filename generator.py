@@ -35,12 +35,15 @@ team_data_tsv_path: path to the TSV file containing the team data.
 Options:
     --loglevel [DEBUG|INFO|WARNING|ERROR] (default: INFO)
     --twosided: add blank page after each odd number of pages (default: False)
-    --force: ignore errors and continue (default: False)"""
+    --force: ignore errors and continue (default: False)
+    --from_line [line_number]: start from this line in the team data file (default: 1)
+    """
     )
 
     parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
     parser.add_argument("--twosided", action="store_true")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--from_line", type=int, default=1)
     parser.add_argument("files_tsv_path")
     parser.add_argument("team_data_tsv_path")
     return parser.parse_args()
@@ -225,6 +228,6 @@ if __name__ == "__main__":
 
     prepare_target_dir(set([r[args.place_header] for r in rows]))
 
-    for id, row in tqdm(enumerate(rows), total=len(rows)):
-        handle_team(id, args, row)
+    for id in tqdm(range(args.from_line-1, len(rows))):
+        handle_team(id, args, rows[id])
     logging.info("Single files are created in the target directory. You can merge them with merger.py.")
