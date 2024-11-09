@@ -188,6 +188,15 @@ def configure_logging(args):
     logger = logging.getLogger()
     logger.addHandler(ErrorRaisingHandler(args.force))
 
+def prepare_target_dir(places):
+    os.makedirs("target", exist_ok=True)
+    if len(os.listdir("target")) > 0:
+        logging.warning("The target directory is not empty. Files may be overwritten.")
+    for place in places:
+        place_dir = os.path.join("target", place)
+        if os.path.exists(place_dir) and len(os.listdir(place_dir)) > 0:
+            logging.error(f"The target directory for {place} is not empty. This can cause silent bugs.")
+
 if __name__ == "__main__":
     ###########################################
     # TODO: legyen opció, hogy üres olal hozzáadása helyett az utolsó oldalt rakja az "egyoldalas" kupacba
@@ -208,12 +217,11 @@ if __name__ == "__main__":
 
     configure_logging(args)
 
-    os.makedirs("target", exist_ok=True)
-    if len(os.listdir("target")) > 0:
-        logging.warning("The target directory is not empty. Files may be overwritten.")
-
     expected_fieldnames = set([args.teamname_header, args.category_header, args.place_header])
     rows = read_tsv_file(args.team_data_tsv_path, expected_fieldnames)
+
+    prepare_target_dir(set([r[args.place_header] for r in rows]))
+
     for id, row in tqdm(enumerate(rows), total=len(rows)):
         handle_team(id, args, row)
     logging.info("Single files are created in the target directory. You can merge them with merger.py.")
