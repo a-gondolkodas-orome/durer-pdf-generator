@@ -8,7 +8,7 @@ import argparse
 # from typing import List
 from tqdm import tqdm
 
-from PyPDF2 import PdfWriter, PdfReader
+from pypdf import PdfWriter, PdfReader
 import io
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
@@ -209,8 +209,11 @@ if __name__ == "__main__":
     configure_logging(args)
 
     os.makedirs("target", exist_ok=True)
+    if len(os.listdir("target")) > 0:
+        logging.warning("The target directory is not empty. Files may be overwritten.")
 
     expected_fieldnames = set([args.teamname_header, args.category_header, args.place_header])
     rows = read_tsv_file(args.team_data_tsv_path, expected_fieldnames)
     for id, row in tqdm(enumerate(rows), total=len(rows)):
         handle_team(id, args, row)
+    logging.info("Single files are created in the target directory. You can merge them with merger.py.")
