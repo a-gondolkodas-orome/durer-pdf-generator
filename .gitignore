@@ -7,3 +7,4 @@ pdfsrc
 *.tsv
 .venv
 *.pdf
+.vscode
