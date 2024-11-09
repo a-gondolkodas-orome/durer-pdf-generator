@@ -19,7 +19,7 @@ pip install -r requirements.txt
 3) **Team datas:** Create a `.tsv` file where you define what to print in the header of each team. (see `teamdatas.tsv.sample`)
 4) Run the script
 ```
-python do.py input_tsvs/files.tsv input_tsvs/teamdatas.tsv
+python generator.py input_tsvs/files.tsv input_tsvs/teamdatas.tsv
 ```
 Additional options:
 ```
@@ -39,5 +39,6 @@ python merger.py --aftertext 1oldalas_feladatsor
 ## Debug
 
 If some error happened you can try
-- Running in debug level: `python do.py --loglevel=DEBUG`
+- Run F5 in VsCode with the `generator.py` file open. This will stop at the error and you can check the variables.
+- Running in debug level: `python generator.py --loglevel=DEBUG`
 - Checking the output file at target/location/n.tex. Which file failed should be easy to determine.
