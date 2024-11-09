@@ -191,10 +191,13 @@ def configure_logging(args):
 def prepare_target_dir(places):
     os.makedirs("target", exist_ok=True)
     if len(os.listdir("target")) > 0:
-        logging.warning("The target directory is not empty. Files may be overwritten.")
+        logging.warning("The target directory is not empty. Files may be overwritten when merging files.")
     for place in places:
+        if "/" in place or "\\" in place:
+            logging.error(f"Place name {place} contains a slash. Please remove it.")
         place_dir = os.path.join("target", place)
-        if os.path.exists(place_dir) and len(os.listdir(place_dir)) > 0:
+        os.makedirs(place_dir, exist_ok=True)
+        if len(os.listdir(place_dir)) > 0:
             logging.error(f"The target directory for {place} is not empty. This can cause silent bugs.")
 
 if __name__ == "__main__":
