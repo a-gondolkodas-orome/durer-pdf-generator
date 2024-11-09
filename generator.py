@@ -81,10 +81,9 @@ def writeover(input_fn, output_fn, data, twosided=False):
     can.rotate(90)
     can.setFont('MySerif', 10)
     # work-around for arabic.
-    # HACK: Check for exact team name
-    # TODO: C₈H₁₀N₄O₂
-    # TODO: pi
-	 # az arab karakterek benne vannak UNICODE-ban, így az alapján lehet őket a text-ben detektálni függvénnyel.
+
+
+
     #if "نحن أذكياء جدا" in data:
     #    can.setFont('Arab', 10)
     #    can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
@@ -210,12 +209,10 @@ if __name__ == "__main__":
     # TODO: nagyon hosszú csapatneveket trim-elni
 
 
-    pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))    # registers latin-based script
-    #pdfmetrics.registerFont(TTFont('Arab', 'fonts/noto/NotoNaskhArabic-Regular.ttf'))    # registers arabic script
-
-#    all_places:List[str] = []
-
-    ############################################
+    #pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))
+    # https://github.com/satbyy/go-noto-universal
+    pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/GoNotoCurrent-Regular.ttf'))
+    #pdfmetrics.registerFont(TTFont('MySerif', 'NotoEmoji-VariableFont_wght.ttf'))
     
     args = parsing()
     set_headers(args)
