@@ -4,8 +4,39 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import inch
 
-def writeover(input_fn, output_fn, data, twosided=False):
+def get_wrapped_text(text, font_name, font_size, max_width):
+    from reportlab.pdfgen import canvas
+    from io import BytesIO
+    
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer)
+    c.setFont(font_name, font_size)
+    
+    words = text.split()
+    lines = []
+    current_line = words[0]
+    
+    for word in words[1:]:
+        if c.stringWidth(current_line + ' ' + word) <= max_width:
+            current_line += ' ' + word
+        else:
+            lines.append(current_line)
+            current_line = word
+    
+    lines.append(current_line)
+    
+    return '\n'.join(lines)
+
+def get_text_height(text, font_name, font_size, max_width):
+    wrapped_text = get_wrapped_text(text, font_name, font_size, max_width)
+    return (wrapped_text.count('\n') + 1) * (font_size + 2)  # Add 2 points of leading
+
+def writeover(input_fn, output_fn, data):
     pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/GoNotoCurrent-Regular.ttf'))
 
     packet = io.BytesIO()
@@ -17,42 +48,53 @@ def writeover(input_fn, output_fn, data, twosided=False):
     page_width = A4[1]
     line_height = fontSize * 1.2  # spacing between lines
     
-    # Split data into lines
-    lines = data.split('\n')
+    # Wrap text
+    wrapped_text = get_wrapped_text(data, 'MySerif', fontSize, page_width * 0.95)
+    lines = wrapped_text.split('\n')
     
-    # Draw each line centered
-    y_position = 22  # starting y position
-    for line in reversed(lines):
-        text_width = can.stringWidth(line, 'MySerif', fontSize)
-        x = (page_width - text_width) / 2
-        if text_width > page_width * 0.95:
-            print(f"WARNING: Text too long, split the following line to more lines: {line}")
-        can.drawString(x, y_position, line)
-        y_position += line_height  # move up for next line
+    # Create a ParagraphStyle
+    style = ParagraphStyle(
+        name='MyStyle',
+        fontName='MySerif',
+        fontSize=fontSize,
+        leading=line_height,
+        alignment=1,  # Center alignment
+    )
     
-    can.showPage()
-    can.save()
-
+    # Create a Paragraph object
+    
+    # Create a Paragraph object
+    paragraph = Paragraph('<br/>'.join(lines), style)
+    
+    # Adjust the canvas to start from the bottom
+    can.translate(0, 0)
+    
+    # Create a SimpleDocTemplate
+    doc = SimpleDocTemplate(packet, pagesize=(A4[1], A4[0]))
+    
+    # Build the document with the paragraph
+    doc.build([paragraph])
+    
+    packet.seek(0)
     packet.seek(0)
     new_pdf = PdfReader(packet)
-    existing_pdf = PdfReader(open(input_fn, "rb"))
+    existing_pdf = PdfReader(input_fn)
     output = PdfWriter()
 
     for i in range(len(existing_pdf.pages)):
         page = existing_pdf.pages[i]
-        page.merge_page(new_pdf.pages[0])
+        if i == 0:
+            page.merge_page(new_pdf.pages[0])
         output.add_page(page)
-        
-    if twosided and (len(existing_pdf.pages) % 2 == 1):
-        output.add_blank_page()
 
-    outputStream = open(output_fn, "wb")
-    output.write(outputStream)
-    outputStream.close()
+    with open(output_fn, "wb") as outputStream:
+        output.write(outputStream)
+
 
 if __name__ == "__main__":
     writeover(
         "XVIII_KisDurer_eredmenyek.pdf",
         "output2.pdf",
-        """A döntőbe jutás feltétele, hogy a csapat a saját helyszínén győzött (Q), vagy elérte a ponthatárt és iskolájából nem előzte meg egynél több csapat (q). A bejutókat Q és q jelöli"""
+        """A döntőbe jutás feltétele, hoqweqweqwegy a csapat a saját helyszínén győzött (Q), vagy elérte a ponthatárt és iskolájából nem előzte meg egynél több csapat (q). A bejutókat Q és q jelöli
+        asdaqwesd"""
     )
