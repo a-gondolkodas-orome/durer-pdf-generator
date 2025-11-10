@@ -85,7 +85,7 @@ def parsing():
 team_data_tsv_path: path to the TSV file containing the team data. 
 Options:
     --loglevel [DEBUG|INFO|WARNING|ERROR] (default: INFO)
-    --twosided: add blank page after each odd number of pages (default: False)
+    --twosided: add a watermarked blank page 1) at the end of document if the file is 'duplex' or 1-page long; 2) after each page if the file is 'simplex'.  (default: False)
     --force: ignore errors and continue (default: False)
     --from_line [line_number]: start from this line in the team data file (default: 1)
     """
