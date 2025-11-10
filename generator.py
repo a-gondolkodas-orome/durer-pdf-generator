@@ -1,12 +1,10 @@
 from collections import defaultdict
-# from datetime import datetime
 import logging
 import os
 import shutil
 import argparse
 from typing import Literal, Dict, List
 from venv import logger
-# from typing import List
 from tqdm import tqdm
 import pandas as pd
 from pydantic import BaseModel
@@ -14,13 +12,13 @@ from pypdf import PdfWriter, PdfReader
 import io
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-CATEGORY_HEADER = 'Kategória'
-TEAMNAME_HEADER = 'Rövidített csapatnév (helyszín, terem)'
-PLACE_HEADER = 'Helyszín'
+CATEGORY_HEADER = "Kategória"
+TEAMNAME_HEADER = "Rövidített csapatnév (helyszín, terem)"
+PLACE_HEADER = "Helyszín"
+
 
 class CompetitionFile(BaseModel):
     category: str
@@ -28,7 +26,9 @@ class CompetitionFile(BaseModel):
     copies: int
     duplex: Literal["", "duplex", "simplex"]
 
+
 type FilesDict = Dict[str, List[CompetitionFile]]
+
 
 def get_non_a4_pages(path):
     full_path = os.path.join("pdfsrc", path)
@@ -45,6 +45,7 @@ def get_non_a4_pages(path):
             non_a4_pages.append(i + 1)  # Page numbers are 1-based
     return non_a4_pages
 
+
 def get_page_count(path):
     """Get the number of pages in a PDF file."""
     full_path = os.path.join("pdfsrc", path)
@@ -53,6 +54,7 @@ def get_page_count(path):
         return 0
     pdf = PdfReader(open(full_path, "rb"))
     return len(pdf.pages)
+
 
 def validate_duplex_setting(filename: str, duplex_value: str):
     """Validate duplex setting based on page count and --twosided flag."""
@@ -63,12 +65,17 @@ def validate_duplex_setting(filename: str, duplex_value: str):
     # For 1-page PDFs, duplex must be empty
     if page_count == 1:
         if duplex_value != "":
-            raise ValueError(f"For 1-page PDF ({filename}), duplex column must be empty, but got '{duplex_value}'")
+            raise ValueError(
+                f"For 1-page PDF ({filename}), duplex column must be empty, but got '{duplex_value}'"
+            )
         return
 
     # For multi-page PDFs, duplex must be "duplex" or "simplex"
     if duplex_value not in ["duplex", "simplex"]:
-        raise ValueError(f"For multi-page PDF ({filename} - {page_count} pages) - duplex column must be 'duplex' or 'simplex', but got '{duplex_value}'")
+        raise ValueError(
+            f"For multi-page PDF ({filename} - {page_count} pages) - duplex column must be 'duplex' or 'simplex', but got '{duplex_value}'"
+        )
+
 
 def parsing():
     parser = argparse.ArgumentParser(
@@ -82,7 +89,12 @@ Options:
     """
     )
 
-    parser.add_argument("--loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR"], nargs='?', default="INFO")
+    parser.add_argument(
+        "--loglevel",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        nargs="?",
+        default="INFO",
+    )
     parser.add_argument("--twosided", action="store_true")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--from_line", type=int, default=1)
@@ -93,67 +105,77 @@ Options:
 
 def load_and_validate_files_tsv(args) -> FilesDict:
     """Read and validate the files TSV, and return it as a FilesDict."""
-    if not args.files_tsv_path.endswith('.tsv'):
+    if not args.files_tsv_path.endswith(".tsv"):
         logging.error(f"The input file ({args.files_tsv_path}) is not a TSV file.")
 
     # Read files TSV using pandas
-    files_df = pd.read_csv(args.files_tsv_path, sep='\t', dtype={
-        'category': str,
-        'filename': str,
-        'copies': int,
-        'duplex': str
-    }, keep_default_na=False)
+    files_df = pd.read_csv(
+        args.files_tsv_path,
+        sep="\t",
+        dtype={"category": str, "filename": str, "copies": int, "duplex": str},
+        keep_default_na=False,
+    )
 
     # Filter out rows with copies <= 0
-    invalid_copies = files_df[files_df['copies'] <= 0]
+    invalid_copies = files_df[files_df["copies"] <= 0]
     for _, row in invalid_copies.iterrows():
-        logging.warning(f"Skipping {row['filename']} because copies is expected positive integer, but got {row['copies']}.")
-    files_df = files_df[files_df['copies'] > 0]
+        logging.warning(
+            f"Skipping {row['filename']} because copies is expected positive integer, but got {row['copies']}."
+        )
+    files_df = files_df[files_df["copies"] > 0]
 
     # Validate duplex settings
     if args.twosided:
         for _, row in files_df.iterrows():
-            validate_duplex_setting(str(row['filename']), str(row['duplex']))
+            validate_duplex_setting(str(row["filename"]), str(row["duplex"]))
 
     # Check for non-A4 pages
     non_a4_pages = {}
-    for filename in files_df['filename'].unique():
+    for filename in files_df["filename"].unique():
         current_non_a4_pages = get_non_a4_pages(filename)
         if len(current_non_a4_pages) > 0:
             non_a4_pages[filename] = current_non_a4_pages
     if len(non_a4_pages) > 0 and not args.force:
-        logging.error(f"Non-A4 pages found in the following files and pages: {non_a4_pages}.")
+        logging.error(
+            f"Non-A4 pages found in the following files and pages: {non_a4_pages}."
+        )
 
     # Convert to dict
     files_dict: Dict[str, List[CompetitionFile]] = defaultdict(list)
     for _, row in files_df.iterrows():
-        files_dict[str(row['category'])].append(CompetitionFile(
-            category=str(row['category']),
-            filename=str(row['filename']),
-            copies=int(row['copies']),
-            duplex=str(row['duplex'])))
+        files_dict[str(row["category"])].append(
+            CompetitionFile(
+                category=str(row["category"]),
+                filename=str(row["filename"]),
+                copies=int(row["copies"]),
+                duplex=str(row["duplex"]),
+            )
+        )
 
     return files_dict
 
-def add_watermark_and_blank_pages_to_pdf(input_fn, output_fn, data, twosided=False, duplex_setting=""):
+
+def add_watermark_and_blank_pages_to_pdf(
+    input_fn, output_fn, data, twosided=False, duplex_setting=""
+):
     packet = io.BytesIO()
     # Create a new PDF with Reportlab
     can = canvas.Canvas(packet, pagesize=A4)
     can.rotate(90)
-    can.setFont('MySerif', 10)
+    can.setFont("MySerif", 10)
     # work-around for arabic.
-    #if "نحن أذكياء جدا" in data:
+    # if "نحن أذكياء جدا" in data:
     #    can.setFont('Arab', 10)
     #    can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
     #    can.setFont('MySerif', 10)
     #    can.drawString(100, -30, data[len("نحن أذكياء جدا"):])
-    #else:
+    # else:
     #    can.drawString(40, -30, data)
     can.drawString(40, -30, data)
     can.showPage()
     can.save()
 
-    packet.seek(0) # Move to the beginning of the StringIO buffer
+    packet.seek(0)  # Move to the beginning of the StringIO buffer
     watermarked_pdf = PdfReader(packet)
     existing_pdf = PdfReader(open(input_fn, "rb"))
     output = PdfWriter()
@@ -183,18 +205,21 @@ def add_watermark_and_blank_pages_to_pdf(input_fn, output_fn, data, twosided=Fal
     output.write(outputStream)
     outputStream.close()
 
-def process_team(id:int, files_dict: FilesDict, row: pd.Series, twosided: bool):
+
+def process_team(id: int, files_dict: FilesDict, row: pd.Series, twosided: bool):
     id_str = str(id).zfill(3)
     category = str(row[CATEGORY_HEADER])
     teamname = str(row[TEAMNAME_HEADER])
     place = str(row[PLACE_HEADER])
-    logging.debug(f'Adding new team {teamname} ({category} {place} #{id_str})')
-    os.makedirs(os.path.join('target', place), exist_ok=True)
+    logging.debug(f"Adding new team {teamname} ({category} {place} #{id_str})")
+    os.makedirs(os.path.join("target", place), exist_ok=True)
 
     # Get files for this category from FilesDict
     category_files = files_dict[category]
     if len(category_files) == 0:
-        logging.error(f"'{category}' not in set of possible categories: {files_dict.keys()}. Skipping line {id+2}.")
+        logging.error(
+            f"'{category}' not in set of possible categories: {files_dict.keys()}. Skipping line {id+2}."
+        )
         return
 
     # Create the PDFs
@@ -203,14 +228,22 @@ def process_team(id:int, files_dict: FilesDict, row: pd.Series, twosided: bool):
         original_pdf_path = os.path.join("pdfsrc", file.filename)
 
         if not os.path.exists(original_pdf_path):
-            logging.error(f"{file.filename} not in pdfsrc. Skipping this page in line {id+2}.")
+            logging.error(
+                f"{file.filename} not in pdfsrc. Skipping this page in line {id+2}."
+            )
             continue
 
-        output_pdf_path = os.path.join("target", place, f"{id_str}-{str(pdf_number).zfill(2)}.pdf")
-        logging.debug(f'Adding team {teamname} ({category} {place} #{id_str}) {original_pdf_path} -> {output_pdf_path} (x{file.copies})')
+        output_pdf_path = os.path.join(
+            "target", place, f"{id_str}-{str(pdf_number).zfill(2)}.pdf"
+        )
+        logging.debug(
+            f"Adding team {teamname} ({category} {place} #{id_str}) {original_pdf_path} -> {output_pdf_path} (x{file.copies})"
+        )
 
         try:
-            add_watermark_and_blank_pages_to_pdf(original_pdf_path, output_pdf_path, teamname, twosided, file.duplex)
+            add_watermark_and_blank_pages_to_pdf(
+                original_pdf_path, output_pdf_path, teamname, twosided, file.duplex
+            )
         except Exception:
             logging.error(f"Error happened while writing over {original_pdf_path}")
             raise
@@ -219,35 +252,41 @@ def process_team(id:int, files_dict: FilesDict, row: pd.Series, twosided: bool):
         for i in range(1, file.copies):
             shutil.copy(
                 output_pdf_path,
-                os.path.join('target', place, f"{id_str}-{str(pdf_number).zfill(2)}-{i}.pdf")
+                os.path.join(
+                    "target", place, f"{id_str}-{str(pdf_number).zfill(2)}-{i}.pdf"
+                ),
             )
 
         pdf_number += 1
 
+
 def read_tsv_file(team_data_tsv_path: str) -> pd.DataFrame:
-    if not team_data_tsv_path.endswith('.tsv'):
+    if not team_data_tsv_path.endswith(".tsv"):
         raise ValueError(f"The input file ({team_data_tsv_path}) is not a TSV file.")
 
     team_df = pd.read_csv(
         team_data_tsv_path,
-        sep='\t',
+        sep="\t",
         dtype={
             TEAMNAME_HEADER: str,
             CATEGORY_HEADER: str,
             PLACE_HEADER: str,
         },
-        keep_default_na=False
+        keep_default_na=False,
     )
 
     return team_df
+
 
 class ErrorRaisingHandler(logging.Handler):
     def __init__(self, force=False):
         super().__init__()
         self.force = force
+
     def emit(self, record):
         if record.levelno == logging.ERROR and not self.force:
             raise RuntimeError(record.getMessage())
+
 
 def configure_logging(args):
     # TODO: save to log file?
@@ -263,17 +302,23 @@ def configure_logging(args):
     logger = logging.getLogger()
     logger.addHandler(ErrorRaisingHandler(args.force))
 
+
 def prepare_target_dir(places):
     os.makedirs("target", exist_ok=True)
     if len(os.listdir("target")) > 0:
-        logging.warning("The target directory is not empty. Files may be overwritten when merging files.")
+        logging.warning(
+            "The target directory is not empty. Files may be overwritten when merging files."
+        )
     for place in places:
         if "/" in place or "\\" in place:
             logging.error(f"Place name {place} contains a slash. Please remove it.")
         place_dir = os.path.join("target", place)
         os.makedirs(place_dir, exist_ok=True)
         if len(os.listdir(place_dir)) > 0:
-            logging.error(f"The target directory for {place} is not empty. This can cause silent bugs.")
+            logging.error(
+                f"The target directory for {place} is not empty. This can cause silent bugs."
+            )
+
 
 if __name__ == "__main__":
     ###########################################
@@ -281,12 +326,11 @@ if __name__ == "__main__":
     # TODO: refactor it and the latex code -> szebb legyen a kód, kísérőlevél körlevelezés itt, ne latexben
     # TODO: nagyon hosszú csapatneveket trim-elni
 
-
-    #pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))
+    # pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/NotoSerif-Regular.ttf'))
     # https://github.com/satbyy/go-noto-universal
-    pdfmetrics.registerFont(TTFont('MySerif', 'fonts/noto/GoNotoCurrent-Regular.ttf'))
-    #pdfmetrics.registerFont(TTFont('MySerif', 'NotoEmoji-VariableFont_wght.ttf'))
-    
+    pdfmetrics.registerFont(TTFont("MySerif", "fonts/noto/GoNotoCurrent-Regular.ttf"))
+    # pdfmetrics.registerFont(TTFont('MySerif', 'NotoEmoji-VariableFont_wght.ttf'))
+
     args = parsing()
     files_dict = load_and_validate_files_tsv(args)
 
@@ -296,6 +340,8 @@ if __name__ == "__main__":
 
     prepare_target_dir(set(team_df[PLACE_HEADER].unique()))
 
-    for id in tqdm(range(args.from_line-1, len(team_df))):
+    for id in tqdm(range(args.from_line - 1, len(team_df))):
         process_team(id, files_dict, team_df.iloc[id], args.twosided)
-    logging.info("Single files are created in the target directory. You can merge them with merger.py.")
+    logging.info(
+        "Single files are created in the target directory. You can merge them with merger.py."
+    )
