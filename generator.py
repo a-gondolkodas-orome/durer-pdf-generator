@@ -1,13 +1,15 @@
 from collections import defaultdict
-import csv
 # from datetime import datetime
 import logging
 import os
 import shutil
 import argparse
+from typing import Literal, Dict, List
+from venv import logger
 # from typing import List
 from tqdm import tqdm
-
+import pandas as pd
+from pydantic import BaseModel
 from pypdf import PdfWriter, PdfReader
 import io
 from reportlab.pdfgen import canvas
@@ -16,17 +18,57 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
+CATEGORY_HEADER = 'Kategória'
+TEAMNAME_HEADER = 'Rövidített csapatnév (helyszín, terem)'
+PLACE_HEADER = 'Helyszín'
+
+class CompetitionFile(BaseModel):
+    category: str
+    filename: str
+    copies: int
+    duplex: Literal["", "duplex", "simplex"]
+
+type FilesDict = Dict[str, List[CompetitionFile]]
+
 def get_non_a4_pages(path):
+    full_path = os.path.join("pdfsrc", path)
+    if not os.path.exists(full_path):
+        logger.error(f"{full_path} does not exist. Cannot check page sizes.")
+        return []
     non_a4_pages = []
-    if path in os.listdir("pdfsrc"):
-        pdf = PdfReader(open(os.path.join("pdfsrc", path), "rb"))
-        for i in range(len(pdf.pages)):
-            width = pdf.pages[i].mediabox.width
-            height = pdf.pages[i].mediabox.height
-            tolerance = 1
-            if abs(width - 595) > tolerance or abs(height - 842) > tolerance:
-                non_a4_pages.append(i + 1)  # Page numbers are 1-based
+    pdf = PdfReader(open(full_path, "rb"))
+    for i in range(len(pdf.pages)):
+        width = pdf.pages[i].mediabox.width
+        height = pdf.pages[i].mediabox.height
+        tolerance = 1
+        if abs(width - 595) > tolerance or abs(height - 842) > tolerance:
+            non_a4_pages.append(i + 1)  # Page numbers are 1-based
     return non_a4_pages
+
+def get_page_count(path):
+    """Get the number of pages in a PDF file."""
+    full_path = os.path.join("pdfsrc", path)
+    if not os.path.exists(full_path):
+        logger.error(f"{full_path} does not exist. Cannot get page count.")
+        return 0
+    pdf = PdfReader(open(full_path, "rb"))
+    return len(pdf.pages)
+
+def validate_duplex_setting(filename: str, duplex_value: str):
+    """Validate duplex setting based on page count and --twosided flag."""
+    page_count = get_page_count(filename)
+    if page_count == 0:
+        raise ValueError(f"Page count is 0 for {filename}")
+
+    # For 1-page PDFs, duplex must be empty
+    if page_count == 1:
+        if duplex_value != "":
+            raise ValueError(f"For 1-page PDF ({filename}), duplex column must be empty, but got '{duplex_value}'")
+        return
+
+    # For multi-page PDFs, duplex must be "duplex" or "simplex"
+    if duplex_value not in ["duplex", "simplex"]:
+        raise ValueError(f"For multi-page PDF ({filename} - {page_count} pages) - duplex column must be 'duplex' or 'simplex', but got '{duplex_value}'")
 
 def parsing():
     parser = argparse.ArgumentParser(
@@ -48,42 +90,58 @@ Options:
     parser.add_argument("team_data_tsv_path")
     return parser.parse_args()
 
-def set_headers(args):
-    # itt add meg, hogy az input fájlban milyen header nevek szerepelnek
-    args.category_header = 'Kategória'
-    args.teamname_header = 'Rövidített csapatnév (helyszín, terem)' # ez igazából nem a csapatnév, hanem a csapatnév + helyszín + terem
-    args.place_header = 'Helyszín'
 
-def init_categories(args):
-    args.possible_categories = defaultdict(list)
-    args.num = defaultdict(list)
-    non_a4_pages = {}
+def load_and_validate_files_tsv(args) -> FilesDict:
+    """Read and validate the files TSV, and return it as a FilesDict."""
     if not args.files_tsv_path.endswith('.tsv'):
         logging.error(f"The input file ({args.files_tsv_path}) is not a TSV file.")
-    with open(args.files_tsv_path, 'r', encoding="utf8") as f:
-        reader = csv.DictReader(f, delimiter='\t')
-        for row in reader:
-            if int(row['copies']) > 0:
-                args.possible_categories[row['category']].append(row['filename'])
-                args.num[row['category']].append(int(row['copies']))
-                current_non_a4_pages = get_non_a4_pages(row['filename'])
-                if(len(current_non_a4_pages) > 0):
-                    non_a4_pages[row['filename']] = current_non_a4_pages
-            else:
-                logging.warning(f"Skipping {row['filename']} because copies is expected positive integer, but got {row['copies']}.")
+
+    # Read files TSV using pandas
+    files_df = pd.read_csv(args.files_tsv_path, sep='\t', dtype={
+        'category': str,
+        'filename': str,
+        'copies': int,
+        'duplex': str
+    }, keep_default_na=False)
+
+    # Filter out rows with copies <= 0
+    invalid_copies = files_df[files_df['copies'] <= 0]
+    for _, row in invalid_copies.iterrows():
+        logging.warning(f"Skipping {row['filename']} because copies is expected positive integer, but got {row['copies']}.")
+    files_df = files_df[files_df['copies'] > 0]
+
+    # Validate duplex settings
+    if args.twosided:
+        for _, row in files_df.iterrows():
+            validate_duplex_setting(str(row['filename']), str(row['duplex']))
+
+    # Check for non-A4 pages
+    non_a4_pages = {}
+    for filename in files_df['filename'].unique():
+        current_non_a4_pages = get_non_a4_pages(filename)
+        if len(current_non_a4_pages) > 0:
+            non_a4_pages[filename] = current_non_a4_pages
     if len(non_a4_pages) > 0 and not args.force:
         logging.error(f"Non-A4 pages found in the following files and pages: {non_a4_pages}.")
 
-def writeover(input_fn, output_fn, data, twosided=False):
+    # Convert to dict
+    files_dict: Dict[str, List[CompetitionFile]] = defaultdict(list)
+    for _, row in files_df.iterrows():
+        files_dict[str(row['category'])].append(CompetitionFile(
+            category=str(row['category']),
+            filename=str(row['filename']),
+            copies=int(row['copies']),
+            duplex=str(row['duplex'])))
+
+    return files_dict
+
+def add_watermark_and_blank_pages_to_pdf(input_fn, output_fn, data, twosided=False, duplex_setting=""):
     packet = io.BytesIO()
     # Create a new PDF with Reportlab
     can = canvas.Canvas(packet, pagesize=A4)
     can.rotate(90)
     can.setFont('MySerif', 10)
     # work-around for arabic.
-
-
-
     #if "نحن أذكياء جدا" in data:
     #    can.setFont('Arab', 10)
     #    can.drawString(40, -30, data[:len("نحن أذكياء جدا")])
@@ -95,78 +153,93 @@ def writeover(input_fn, output_fn, data, twosided=False):
     can.showPage()
     can.save()
 
-    # Move to the beginning of the StringIO buffer
-    packet.seek(0)
-    new_pdf = PdfReader(packet)
-    # Read your existing PDF
+    packet.seek(0) # Move to the beginning of the StringIO buffer
+    watermarked_pdf = PdfReader(packet)
     existing_pdf = PdfReader(open(input_fn, "rb"))
     output = PdfWriter()
+
     # Add the "watermark" (which is the new pdf) on the existing page
-    for i in range(len(existing_pdf.pages)):
-        page = existing_pdf.pages[i]
-        page.merge_page(new_pdf.pages[0])
-        output.add_page(page)
-		
-		# add blank page if the document has an odd number of pages
-    if twosided and (len(existing_pdf.pages) % 2 == 1):
-        output.add_blank_page()
+    # Handle blank page insertion based on duplex setting
+    if twosided and duplex_setting == "simplex":
+        # For simplex: add blank page after every page
+        for i in range(len(existing_pdf.pages)):
+            page = existing_pdf.pages[i]
+            page.merge_page(watermarked_pdf.pages[0])
+            output.add_page(page)
+            output.add_blank_page()
+    else:
+        # For duplex or empty (1-page): add pages normally
+        for i in range(len(existing_pdf.pages)):
+            page = existing_pdf.pages[i]
+            page.merge_page(watermarked_pdf.pages[0])
+            output.add_page(page)
+
+        # Add blank page at end if duplex/empty and odd page count
+        if twosided and (len(existing_pdf.pages) % 2 == 1):
+            output.add_blank_page()
 
     # Finally, write "output" to a real file
     outputStream = open(output_fn, "wb")
     output.write(outputStream)
     outputStream.close()
 
-def handle_team(id:str, args, row=None, reserve=False):
+def process_team(id:int, files_dict: FilesDict, row: pd.Series, twosided: bool):
     id_str = str(id).zfill(3)
-    logging.debug(f'Adding new team')
-    category = row[args.category_header]
-    teamname = row[args.teamname_header]
-    place = row[args.place_header]
+    category = str(row[CATEGORY_HEADER])
+    teamname = str(row[TEAMNAME_HEADER])
+    place = str(row[PLACE_HEADER])
+    logging.debug(f'Adding new team {teamname} ({category} {place} #{id_str})')
     os.makedirs(os.path.join('target', place), exist_ok=True)
 
-    if category not in args.possible_categories.keys():
-        logging.error(f"'{category}' not in set of possible categories: {[*args.possible_categories.keys()]}. Skipping line {id+2}.")
+    # Get files for this category from FilesDict
+    category_files = files_dict[category]
+    if len(category_files) == 0:
+        logging.error(f"'{category}' not in set of possible categories: {files_dict.keys()}. Skipping line {id+2}.")
         return
 
-    # Prepare the PDFs
-    original_pdfs = []
-    num_copies_list = []
-    for pdf, copies in zip(args.possible_categories[category], args.num[category]):
-        if not os.path.exists(os.path.join("pdfsrc", pdf)):
-            logging.error(f"{pdf} not in pdfsrc. Skipping this page in line {id+2}.")
-            continue
-        original_pdfs.append(os.path.join("pdfsrc", pdf))
-        num_copies_list.append(copies)
-
     # Create the PDFs
-    for pdf_number, original_pdf_path in enumerate(original_pdfs):
+    pdf_number = 0
+    for file in category_files:
+        original_pdf_path = os.path.join("pdfsrc", file.filename)
+
+        if not os.path.exists(original_pdf_path):
+            logging.error(f"{file.filename} not in pdfsrc. Skipping this page in line {id+2}.")
+            continue
+
         output_pdf_path = os.path.join("target", place, f"{id_str}-{str(pdf_number).zfill(2)}.pdf")
-        logging.debug(f'Adding team {teamname} ({category} {place} #{id_str}) {original_pdf_path} -> {output_pdf_path} (x{num_copies_list[pdf_number]})')
+        logging.debug(f'Adding team {teamname} ({category} {place} #{id_str}) {original_pdf_path} -> {output_pdf_path} (x{file.copies})')
+
         try:
-            writeover(original_pdf_path, output_pdf_path, teamname, args.twosided)
+            add_watermark_and_blank_pages_to_pdf(original_pdf_path, output_pdf_path, teamname, twosided, file.duplex)
         except Exception:
             logging.error(f"Error happened while writing over {original_pdf_path}")
             raise
 
-    # Copy the PDFs
-    for pdf_number, num_copies in enumerate(num_copies_list):
-        for i in range(1, num_copies):
+        # Copy the PDF if copies > 1
+        for i in range(1, file.copies):
             shutil.copy(
-                os.path.join('target', place, f"{id_str}-{str(pdf_number).zfill(2)}.pdf"),
+                output_pdf_path,
                 os.path.join('target', place, f"{id_str}-{str(pdf_number).zfill(2)}-{i}.pdf")
             )
 
-def read_tsv_file(team_data_tsv_path, expected_fieldnames):
-    rows = []
+        pdf_number += 1
+
+def read_tsv_file(team_data_tsv_path: str) -> pd.DataFrame:
     if not team_data_tsv_path.endswith('.tsv'):
-        logging.error(f"The input file ({team_data_tsv_path}) is not a TSV file.")
-    with open(team_data_tsv_path, 'r', newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f, delimiter='\t', quotechar='"')
-        if set(reader.fieldnames) != expected_fieldnames:
-            raise ValueError("Column names do not match. Expected: %s, got: %s" % (expected_fieldnames, reader.fieldnames))
-        for row in reader:
-            rows.append(row)
-    return rows
+        raise ValueError(f"The input file ({team_data_tsv_path}) is not a TSV file.")
+
+    team_df = pd.read_csv(
+        team_data_tsv_path,
+        sep='\t',
+        dtype={
+            TEAMNAME_HEADER: str,
+            CATEGORY_HEADER: str,
+            PLACE_HEADER: str,
+        },
+        keep_default_na=False
+    )
+
+    return team_df
 
 class ErrorRaisingHandler(logging.Handler):
     def __init__(self, force=False):
@@ -215,16 +288,14 @@ if __name__ == "__main__":
     #pdfmetrics.registerFont(TTFont('MySerif', 'NotoEmoji-VariableFont_wght.ttf'))
     
     args = parsing()
-    set_headers(args)
-    init_categories(args)
+    files_dict = load_and_validate_files_tsv(args)
 
     configure_logging(args)
 
-    expected_fieldnames = set([args.teamname_header, args.category_header, args.place_header])
-    rows = read_tsv_file(args.team_data_tsv_path, expected_fieldnames)
+    team_df = read_tsv_file(args.team_data_tsv_path)
 
-    prepare_target_dir(set([r[args.place_header] for r in rows]))
+    prepare_target_dir(set(team_df[PLACE_HEADER].unique()))
 
-    for id in tqdm(range(args.from_line-1, len(rows))):
-        handle_team(id, args, rows[id])
+    for id in tqdm(range(args.from_line-1, len(team_df))):
+        process_team(id, files_dict, team_df.iloc[id], args.twosided)
     logging.info("Single files are created in the target directory. You can merge them with merger.py.")
