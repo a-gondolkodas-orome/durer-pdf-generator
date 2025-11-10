@@ -4,7 +4,6 @@ import os
 import shutil
 import argparse
 from typing import Literal, Dict, List
-from venv import logger
 from tqdm import tqdm
 import pandas as pd
 from pydantic import BaseModel
@@ -26,6 +25,7 @@ class CompetitionFile(BaseModel):
     copies: int
     duplex: Literal["", "duplex", "simplex"]
 
+logger = logging.getLogger(__name__)
 
 type FilesDict = Dict[str, List[CompetitionFile]]
 
@@ -302,8 +302,8 @@ def configure_logging(args):
         # filemode='w',
         # format='%(asctime)s - %(levelname)s - %(message)s'
     )
-    logger = logging.getLogger()
-    logger.addHandler(ErrorRaisingHandler(args.force))
+    root_logger = logging.getLogger()
+    root_logger.addHandler(ErrorRaisingHandler(args.force))
 
 
 def prepare_target_dir(places):
