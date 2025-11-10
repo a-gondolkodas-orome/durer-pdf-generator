@@ -36,13 +36,14 @@ def get_non_a4_pages(path):
         logger.error(f"{full_path} does not exist. Cannot check page sizes.")
         return []
     non_a4_pages = []
-    pdf = PdfReader(open(full_path, "rb"))
-    for i in range(len(pdf.pages)):
-        width = pdf.pages[i].mediabox.width
-        height = pdf.pages[i].mediabox.height
-        tolerance = 1
-        if abs(width - 595) > tolerance or abs(height - 842) > tolerance:
-            non_a4_pages.append(i + 1)  # Page numbers are 1-based
+    with open(full_path, "rb") as f:
+        pdf = PdfReader(f)
+        for i in range(len(pdf.pages)):
+            width = pdf.pages[i].mediabox.width
+            height = pdf.pages[i].mediabox.height
+            tolerance = 1
+            if abs(width - 595) > tolerance or abs(height - 842) > tolerance:
+                non_a4_pages.append(i + 1)  # Page numbers are 1-based
     return non_a4_pages
 
 
@@ -52,8 +53,9 @@ def get_page_count(path):
     if not os.path.exists(full_path):
         logger.error(f"{full_path} does not exist. Cannot get page count.")
         return 0
-    pdf = PdfReader(open(full_path, "rb"))
-    return len(pdf.pages)
+    with open(full_path, "rb") as f:
+        pdf = PdfReader(f)
+        return len(pdf.pages)
 
 
 def validate_duplex_setting(filename: str, duplex_value: str):
@@ -177,36 +179,37 @@ def add_watermark_and_blank_pages_to_pdf(
 
     packet.seek(0)  # Move to the beginning of the StringIO buffer
     watermarked_pdf = PdfReader(packet)
-    existing_pdf = PdfReader(open(input_fn, "rb"))
-    output = PdfWriter()
 
-    # Add the "watermark" (which is the new pdf) on the existing page
-    # Handle blank page insertion based on duplex setting
-    if twosided and duplex_setting == "simplex":
-        # For simplex: add blank page after every page
-        for i in range(len(existing_pdf.pages)):
-            page = existing_pdf.pages[i]
-            page.merge_page(watermarked_pdf.pages[0])
-            output.add_page(page)
-            # Add watermarked blank page
-            blank_page = output.add_blank_page()
-            blank_page.merge_page(watermarked_pdf.pages[0])
-    else:
-        # For duplex or empty (1-page): add pages normally
-        for i in range(len(existing_pdf.pages)):
-            page = existing_pdf.pages[i]
-            page.merge_page(watermarked_pdf.pages[0])
-            output.add_page(page)
+    with open(input_fn, "rb") as input_file:
+        existing_pdf = PdfReader(input_file)
+        output = PdfWriter()
 
-        # Add blank page at end if duplex/empty and odd page count
-        if twosided and (len(existing_pdf.pages) % 2 == 1):
-            blank_page = output.add_blank_page()
-            blank_page.merge_page(watermarked_pdf.pages[0])
+        # Add the "watermark" (which is the new pdf) on the existing page
+        # Handle blank page insertion based on duplex setting
+        if twosided and duplex_setting == "simplex":
+            # For simplex: add blank page after every page
+            for i in range(len(existing_pdf.pages)):
+                page = existing_pdf.pages[i]
+                page.merge_page(watermarked_pdf.pages[0])
+                output.add_page(page)
+                # Add watermarked blank page
+                blank_page = output.add_blank_page()
+                blank_page.merge_page(watermarked_pdf.pages[0])
+        else:
+            # For duplex or empty (1-page): add pages normally
+            for i in range(len(existing_pdf.pages)):
+                page = existing_pdf.pages[i]
+                page.merge_page(watermarked_pdf.pages[0])
+                output.add_page(page)
 
-    # Finally, write "output" to a real file
-    outputStream = open(output_fn, "wb")
-    output.write(outputStream)
-    outputStream.close()
+            # Add blank page at end if duplex/empty and odd page count
+            if twosided and (len(existing_pdf.pages) % 2 == 1):
+                blank_page = output.add_blank_page()
+                blank_page.merge_page(watermarked_pdf.pages[0])
+
+        # Finally, write "output" to a real file
+        with open(output_fn, "wb") as output_file:
+            output.write(output_file)
 
 
 def process_team(id: int, files_dict: FilesDict, row: pd.Series, twosided: bool):
