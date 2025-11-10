@@ -14,14 +14,14 @@ Then run the following command in the project folder to install the dependencies
 uv sync
 ```
 
-Later, you need to activate the virtual environment before running the scripts:
+Later, you always need to activate the virtual environment before running the scripts:
 
 ```
 source .venv/bin/activate    # On Linux/MacOS:
 .venv\Scripts\activate    # On Windows:
 ```
 
-## USAGE:
+## Usage
 
 1) **PDF files:** Copy PDF files which need to be compiled in the folder `pdfsrc`.
 2) **Category-wise files:** Create a `.tsv` file (see `input_tsvs/sample_files.tsv`) where you define
@@ -47,12 +47,6 @@ You might want to check out the generated PDFs for the weirder teamnames.
 ```
 python merger.py --aftertext 1oldalas_feladatsor
 ```
-
-## Details
-
-### Two-sided printing
-
-For 1-page long PDF it must be empty. 
 
 ## Debug
 
