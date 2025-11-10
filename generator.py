@@ -188,7 +188,9 @@ def add_watermark_and_blank_pages_to_pdf(
             page = existing_pdf.pages[i]
             page.merge_page(watermarked_pdf.pages[0])
             output.add_page(page)
-            output.add_blank_page()
+            # Add watermarked blank page
+            blank_page = output.add_blank_page()
+            blank_page.merge_page(watermarked_pdf.pages[0])
     else:
         # For duplex or empty (1-page): add pages normally
         for i in range(len(existing_pdf.pages)):
@@ -198,7 +200,8 @@ def add_watermark_and_blank_pages_to_pdf(
 
         # Add blank page at end if duplex/empty and odd page count
         if twosided and (len(existing_pdf.pages) % 2 == 1):
-            output.add_blank_page()
+            blank_page = output.add_blank_page()
+            blank_page.merge_page(watermarked_pdf.pages[0])
 
     # Finally, write "output" to a real file
     outputStream = open(output_fn, "wb")
