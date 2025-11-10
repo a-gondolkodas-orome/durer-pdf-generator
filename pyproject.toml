@@ -1,0 +1,13 @@
+[project]
+name = "durer-pdf-generator"
+version = "0.1.0"
+description = "A PDF generator project for Durer competition local round"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "pypdf==5.1.0",
+    "reportlab==4.2.5",
+    "tqdm==4.67.0",
+    "pandas==2.3.3",
+    "pydantic==2.12.4",
+]

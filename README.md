@@ -6,10 +6,19 @@ Tab-separated value (`.tsv`) files are used to define the files and the teams. I
 
 ## Install
 
-It is recommended to use [virtual environment](https://docs.python.org/3/tutorial/venv.html). After that install the required packages:
+First, you need to install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you don't have it yet.
+
+Then run the following command in the project folder to install the dependencies:
 
 ```
-pip install -r requirements.txt
+uv sync
+```
+
+Later, you need to activate the virtual environment before running the scripts:
+
+```
+source .venv/bin/activate    # On Linux/MacOS:
+.venv\Scripts\activate    # On Windows:
 ```
 
 ## USAGE:
