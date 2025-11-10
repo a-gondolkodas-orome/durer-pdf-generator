@@ -1,6 +1,0 @@
-chardet==5.2.0
-colorama==0.4.6
-pillow==11.0.0
-pypdf==5.1.0
-reportlab==4.2.5
-tqdm==4.67.0

@@ -6,17 +6,28 @@ Tab-separated value (`.tsv`) files are used to define the files and the teams. I
 
 ## Install
 
-It is recommended to use [virtual environment](https://docs.python.org/3/tutorial/venv.html). After that install the required packages:
+First, you need to install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you don't have it yet.
+
+Then run the following command in the project folder to install the dependencies:
 
 ```
-pip install -r requirements.txt
+uv sync
+```
+
+Later, you need to activate the virtual environment before running the scripts:
+
+```
+source .venv/bin/activate    # On Linux/MacOS:
+.venv\Scripts\activate    # On Windows:
 ```
 
 ## USAGE:
 
 1) **PDF files:** Copy PDF files which need to be compiled in the folder `pdfsrc`.
-2) **Category-wise files:** Create a `.tsv` file where you define how many copies of each file should be created for each team in specific category. (see `files.tsv.sample`)
-3) **Team datas:** Create a `.tsv` file where you define what to print in the header of each team. (see `teamdatas.tsv.sample`)
+2) **Category-wise files:** Create a `.tsv` file (see `input_tsvs/sample_files.tsv`) where you define
+    - how many copies of each file should be created for each team in specific category
+    - which files should be printed in duplex/simplex. For 1-page long files it must be empty.
+3) **Team datas:** Create a `.tsv` file where you define what to print in the header of each team. (see `input_tsvs/sample_teamdatas.tsv`)
 4) Run the script
 ```
 python generator.py input_tsvs/files.tsv input_tsvs/teamdatas.tsv
@@ -24,7 +35,7 @@ python generator.py input_tsvs/files.tsv input_tsvs/teamdatas.tsv
 Additional options:
 ```
 --loglevel [DEBUG|INFO|WARNING|ERROR] (default: INFO)
---twosided: add blank page after each odd number of pages (default: False)
+--twosided: add a watermarked blank page 1) at the end of document if the file is 'duplex' or 1-page long; 2) after each page if the file is 'simplex'.  (default: False)
 --force: ignore errors and continue (default: False)
 --from_line [line_number]: start from this line in the team data file (default: 1)
 ```
@@ -36,6 +47,12 @@ You might want to check out the generated PDFs for the weirder teamnames.
 ```
 python merger.py --aftertext 1oldalas_feladatsor
 ```
+
+## Details
+
+### Two-sided printing
+
+For 1-page long PDF it must be empty. 
 
 ## Debug
 
