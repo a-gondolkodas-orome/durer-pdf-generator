@@ -345,9 +345,9 @@ if __name__ == "__main__":
     # pdfmetrics.registerFont(TTFont('MySerif', 'NotoEmoji-VariableFont_wght.ttf'))
 
     args = parsing()
-    files_dict = load_and_validate_files_tsv(args)
-
     configure_logging(args)
+
+    files_dict = load_and_validate_files_tsv(args)
 
     team_df = read_tsv_file(args.team_data_tsv_path)
 
