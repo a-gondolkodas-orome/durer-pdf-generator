@@ -11,8 +11,9 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "input_tsvs/files.tsv",
-                "input_tsvs/teamdatas.tsv"
+                "input_tsvs/sample_files.tsv",
+                "input_tsvs/sample_teamdatas.tsv",
+                "--twosided"
             ]
         }
     ]

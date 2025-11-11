@@ -23,7 +23,8 @@ class CompetitionFile(BaseModel):
     category: str
     filename: str
     copies: int
-    duplex: Literal["", "duplex", "simplex"]
+    duplex_simplex: Literal["", "duplex", "simplex"]
+
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,8 @@ def load_and_validate_files_tsv(args) -> FilesDict:
     files_df = pd.read_csv(
         args.files_tsv_path,
         sep="\t",
-        dtype={"category": str, "filename": str, "copies": int, "duplex": str},
+        usecols=["category", "filename", "copies", "duplex-simplex"],
+        dtype={"category": str, "filename": str, "copies": int, "duplex-simplex": str},
         keep_default_na=False,
     )
 
@@ -129,7 +131,7 @@ def load_and_validate_files_tsv(args) -> FilesDict:
     # Validate duplex settings
     if args.twosided:
         for _, row in files_df.iterrows():
-            validate_duplex_setting(str(row["filename"]), str(row["duplex"]))
+            validate_duplex_setting(str(row["filename"]), str(row["duplex-simplex"]))
 
     # Check for non-A4 pages
     non_a4_pages = {}
@@ -150,7 +152,7 @@ def load_and_validate_files_tsv(args) -> FilesDict:
                 category=str(row["category"]),
                 filename=str(row["filename"]),
                 copies=int(row["copies"]),
-                duplex=str(row["duplex"]),
+                duplex_simplex=str(row["duplex-simplex"]),
             )
         )
 
@@ -248,7 +250,11 @@ def process_team(id: int, files_dict: FilesDict, row: pd.Series, twosided: bool)
 
         try:
             add_watermark_and_blank_pages_to_pdf(
-                original_pdf_path, output_pdf_path, teamname, twosided, file.duplex
+                original_pdf_path,
+                output_pdf_path,
+                teamname,
+                twosided,
+                file.duplex_simplex,
             )
         except Exception:
             logging.error(f"Error happened while writing over {original_pdf_path}")
@@ -273,6 +279,7 @@ def read_tsv_file(team_data_tsv_path: str) -> pd.DataFrame:
     team_df = pd.read_csv(
         team_data_tsv_path,
         sep="\t",
+        usecols=[TEAMNAME_HEADER, CATEGORY_HEADER, PLACE_HEADER],
         dtype={
             TEAMNAME_HEADER: str,
             CATEGORY_HEADER: str,
